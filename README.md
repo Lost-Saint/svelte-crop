@@ -7,7 +7,7 @@ This is a rewrite of `react-easy-crop` (https://github.com/valentinh/react-easy-
 
 > ℹ️ The minimum supported Svelte version is v5. If you are still on an older version, you need to use the 3.x.x versions of `svelte-crop`
 
-[![version][version-badge]][package] [![Monthly downloads][npmstats-badge]][npmstats] ![gzip size][gzip-badge] [![GLWTS License][license-badge]][license] [![PRs Welcome][prs-badge]][prs]
+[![npm version][version-badge]][package] [![Monthly downloads][downloads-badge]][npmstats] [![gzip size][gzip-badge]][package] [![License: GLWTS][license-badge]][license] [![PRs welcome][prs-badge]][prs]
 
 ![svelte-crop Demo](https://user-images.githubusercontent.com/2678610/41561426-365e7a44-734a-11e8-8e0e-1c04251f53e4.gif)
 
@@ -177,17 +177,14 @@ Open `http://localhost:3000` to use the demo. Install the Playwright browser onc
 
 ## License
 
-[GLWTS](https://github.com/Lost-Saint/svelte-crop/blob/master/LICENSE)
+[GLWTS](https://github.com/Lost-Saint/svelte-crop/blob/main/LICENSE)
 
-[npm]: https://www.npmjs.com/
-[node]: https://nodejs.org
-[version-badge]: https://img.shields.io/npm/v/svelte-crop.svg?style=flat-square
+[version-badge]: https://img.shields.io/npm/v/svelte-crop?style=flat-square
 [package]: https://www.npmjs.com/package/svelte-crop
-[downloads-badge]: https://img.shields.io/npm/dm/svelte-crop.svg?style=flat-square
-[npmstats]: http://npm-stat.com/charts.html?package=svelte-crop&from=2018-06-18
-[npmstats-badge]: https://img.shields.io/npm/dm/svelte-crop.svg?style=flat-square
-[gzip-badge]: http://img.badgesize.io/https://unpkg.com/svelte-crop@0.0.2/index.js?compression=gzip&style=flat-square
-[license-badge]: https://img.shields.io/badge/license-GLWTS-blue.svg?style=flat-square
-[license]: https://github.com/Lost-Saint/svelte-crop/blob/master/LICENSE
-[prs-badge]: https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square
-[prs]: http://makeapullrequest.com
+[downloads-badge]: https://img.shields.io/npm/dm/svelte-crop?style=flat-square
+[npmstats]: https://npm-stat.com/charts.html?package=svelte-crop
+[gzip-badge]: https://img.badgesize.io/https://unpkg.com/svelte-crop@0.0.2/dist/index.js?compression=gzip&style=flat-square
+[license-badge]: https://img.shields.io/badge/license-GLWTS-blue?style=flat-square
+[license]: https://github.com/Lost-Saint/svelte-crop/blob/main/LICENSE
+[prs-badge]: https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square
+[prs]: https://github.com/Lost-Saint/svelte-crop/pulls
