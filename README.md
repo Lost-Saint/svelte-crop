@@ -1,15 +1,15 @@
-# svelte-easy-crop
+# svelte-crop
 
 A Svelte component to crop images with easy interactions
 
 This is a rewrite of `react-easy-crop` (https://github.com/valentinh/react-easy-crop).
 
 
-> ℹ️ The minimum supported Svelte version is v5. If you are still on an older version, you need to use the 3.x.x versions of `svelte-easy-crop`
+> ℹ️ The minimum supported Svelte version is v5. If you are still on an older version, you need to use the 3.x.x versions of `svelte-crop`
 
 [![version][version-badge]][package] [![Monthly downloads][npmstats-badge]][npmstats] ![gzip size][gzip-badge] [![MIT License][license-badge]][license] [![PRs Welcome][prs-badge]][prs]
 
-![svelte-easy-crop Demo](https://user-images.githubusercontent.com/2678610/41561426-365e7a44-734a-11e8-8e0e-1c04251f53e4.gif)
+![svelte-crop Demo](https://user-images.githubusercontent.com/2678610/41561426-365e7a44-734a-11e8-8e0e-1c04251f53e4.gif)
 
 
 ## Demo
@@ -30,13 +30,13 @@ This is a rewrite of `react-easy-crop` (https://github.com/valentinh/react-easy-
 ## Installation
 
 ```shell
-yarn add svelte-easy-crop
+yarn add svelte-crop
 ```
 
 or
 
 ```shell
-npm install svelte-easy-crop --save
+npm install svelte-crop --save
 ```
 
 ## Basic usage
@@ -46,7 +46,7 @@ npm install svelte-easy-crop --save
 
 ```jsx
 <script>
-  import Cropper from 'svelte-easy-crop'
+  import Cropper from 'svelte-crop'
 
   let image = '/images/dog.jpeg'
   let crop = $state({ x: 0, y: 0 });
@@ -105,7 +105,7 @@ Initial crop props are applied when the media loads. Changing these props alone 
 For an explicit restore during editing, the package exports `getInitialCropFromCroppedAreaPercentages` and `getInitialCropFromCroppedAreaPixels`. Both accept an options object and return `{ crop, zoom }`:
 
 ```ts
-import { getInitialCropFromCroppedAreaPercentages } from 'svelte-easy-crop'
+import { getInitialCropFromCroppedAreaPercentages } from 'svelte-crop'
 
 const restored = getInitialCropFromCroppedAreaPercentages({
   croppedAreaPercentages: savedArea,
@@ -177,17 +177,17 @@ Open `http://localhost:3000` to use the demo. Install the Playwright browser onc
 
 ## License
 
-[MIT](https://github.com/ValentinH/svelte-easy-crop/blob/master/LICENSE)
+[MIT](https://github.com/Lost-Saint/svelte-crop/blob/master/LICENSE)
 
 [npm]: https://www.npmjs.com/
 [node]: https://nodejs.org
-[version-badge]: https://img.shields.io/npm/v/svelte-easy-crop.svg?style=flat-square
-[package]: https://www.npmjs.com/package/svelte-easy-crop
-[downloads-badge]: https://img.shields.io/npm/dm/svelte-easy-crop.svg?style=flat-square
-[npmstats]: http://npm-stat.com/charts.html?package=svelte-easy-crop&from=2018-06-18
-[npmstats-badge]: https://img.shields.io/npm/dm/svelte-easy-crop.svg?style=flat-square
-[gzip-badge]: http://img.badgesize.io/https://unpkg.com/svelte-easy-crop@1.0.0/index.js?compression=gzip&style=flat-square
+[version-badge]: https://img.shields.io/npm/v/svelte-crop.svg?style=flat-square
+[package]: https://www.npmjs.com/package/svelte-crop
+[downloads-badge]: https://img.shields.io/npm/dm/svelte-crop.svg?style=flat-square
+[npmstats]: http://npm-stat.com/charts.html?package=svelte-crop&from=2018-06-18
+[npmstats-badge]: https://img.shields.io/npm/dm/svelte-crop.svg?style=flat-square
+[gzip-badge]: http://img.badgesize.io/https://unpkg.com/svelte-crop@1.0.0/index.js?compression=gzip&style=flat-square
 [license-badge]: https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square
-[license]: https://github.com/ValentinH/svelte-easy-crop/blob/master/LICENSE
+[license]: https://github.com/Lost-Saint/svelte-crop/blob/master/LICENSE
 [prs-badge]: https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square
 [prs]: http://makeapullrequest.com

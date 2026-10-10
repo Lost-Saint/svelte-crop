@@ -1,4 +1,4 @@
-Thanks a lot for contributing to svelte-easy-crop :beers:
+Thanks a lot for contributing to svelte-crop :beers:
 
 Before submitting the Pull Request, please:
 

@@ -1,4 +1,4 @@
-# Contributing to svelte-easy-crop
+# Contributing to svelte-crop
 
 **Working on your first Pull Request?** You can learn how from this _free_ series [How to Contribute to an Open Source Project on GitHub](https://egghead.io/series/how-to-contribute-to-an-open-source-project-on-github)
 
@@ -10,10 +10,10 @@ To install the project you need to have `bun` and `node`
 
    ```
    # Clone your fork
-   git clone https://github.com/<your-username>/svelte-easy-crop.git
+   git clone https://github.com/<your-username>/svelte-crop.git
 
    # Navigate to the newly cloned directory
-   cd svelte-easy-crop
+   cd svelte-crop
    ```
 
 2. `bun` to install dependencies

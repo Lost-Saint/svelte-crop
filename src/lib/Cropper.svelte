@@ -820,7 +820,7 @@
 
 <svelte:window onresize={computeSizes} />
 <div
-	class="svelte-easy-crop-container"
+	class="svelte-crop-container"
 	bind:this={containerEl}
 	{@attach attachContainer}
 	{tabindex}
@@ -833,7 +833,7 @@
 	{#if video !== undefined}
 		<video
 			bind:this={videoEl}
-			class="svelte-easy-crop-video"
+			class="svelte-crop-video"
 			data-testid="video"
 			autoplay
 			playsinline
@@ -853,7 +853,7 @@
 	{:else}
 		<img
 			bind:this={imgEl}
-			class="svelte-easy-crop-image"
+			class="svelte-crop-image"
 			data-testid="image"
 			src={image}
 			onload={onMediaLoad}
@@ -865,9 +865,9 @@
 	{#if cropperSize}
 		<div
 			class={[
-				'svelte-easy-crop-area',
-				cropShape === 'round' && 'svelte-easy-crop-round',
-				showGrid && 'svelte-easy-crop-grid',
+				'svelte-crop-area',
+				cropShape === 'round' && 'svelte-crop-round',
+				showGrid && 'svelte-crop-grid',
 			]}
 			style:width={`${cropperSize.width}px`}
 			style:height={`${cropperSize.height}px`}
@@ -878,7 +878,7 @@
 </div>
 
 <style>
-.svelte-easy-crop-container {
+.svelte-crop-container {
 	position: absolute;
 	top: 0;
 	left: 0;
@@ -890,8 +890,8 @@
 	cursor: move;
 }
 
-.svelte-easy-crop-image,
-.svelte-easy-crop-video {
+.svelte-crop-image,
+.svelte-crop-video {
 	max-width: 100%;
 	max-height: 100%;
 	margin: auto;
@@ -903,7 +903,7 @@
 	will-change: transform;
 }
 
-.svelte-easy-crop-area {
+.svelte-crop-area {
 	position: absolute;
 	left: 50%;
 	top: 50%;
@@ -915,7 +915,7 @@
 	overflow: hidden;
 }
 
-.svelte-easy-crop-grid:before {
+.svelte-crop-grid:before {
 	content: " ";
 	box-sizing: border-box;
 	border: 1px solid rgba(255, 255, 255, 0.5);
@@ -928,7 +928,7 @@
 	border-bottom: 0;
 }
 
-.svelte-easy-crop-grid:after {
+.svelte-crop-grid:after {
 	content: " ";
 	box-sizing: border-box;
 	border: 1px solid rgba(255, 255, 255, 0.5);
@@ -941,7 +941,7 @@
 	border-right: 0;
 }
 
-.svelte-easy-crop-round {
+.svelte-crop-round {
 	border-radius: 50%;
 }
 </style>
