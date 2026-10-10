@@ -24,7 +24,6 @@ vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .codex
 .agents
-AGENTS.md
 
 # Playwright
 playwright-report
