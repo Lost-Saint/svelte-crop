@@ -186,6 +186,119 @@ describe('Helpers', () => {
     })
   })
 
+  describe('getInitialCropFromCroppedAreaPercentages', () => {
+    test.each([0, 90, 37])('restores crop and zoom after %i degree rotation', rotation => {
+      const mediaSize = { width: 600, height: 360, naturalWidth: 1200, naturalHeight: 720 }
+      const cropSize = { width: 240, height: 160 }
+      const crop = { x: 39, y: -22 }
+      const zoom = 1.7
+      const areas = helpers.computeCroppedArea(
+        crop,
+        mediaSize,
+        cropSize,
+        cropSize.width / cropSize.height,
+        zoom,
+        rotation,
+      )
+
+      const restored = helpers.getInitialCropFromCroppedAreaPercentages({
+        croppedAreaPercentages: areas.croppedAreaPercentages,
+        mediaSize,
+        rotation,
+        cropSize,
+      })
+
+      expect(restored.zoom).toBeCloseTo(zoom)
+      expect(restored.crop.x).toBeCloseTo(crop.x)
+      expect(restored.crop.y).toBeCloseTo(crop.y)
+    })
+
+    test('uses the clamped zoom to restore position', () => {
+      const restored = helpers.getInitialCropFromCroppedAreaPercentages({
+        croppedAreaPercentages: { x: 25, y: 25, width: 50, height: 50 },
+        mediaSize: { width: 1000, height: 500, naturalWidth: 1000, naturalHeight: 500 },
+        cropSize: { width: 500, height: 250 },
+        minZoom: 2,
+        maxZoom: 3,
+      })
+
+      expect(restored).toEqual({ crop: { x: 250, y: 125 }, zoom: 2 })
+    })
+
+    test('allows negative area positions and returns an unrestricted crop', () => {
+      const restored = helpers.getInitialCropFromCroppedAreaPercentages({
+        croppedAreaPercentages: { x: 75, y: -10, width: 50, height: 50 },
+        mediaSize: { width: 100, height: 100, naturalWidth: 100, naturalHeight: 100 },
+        cropSize: { width: 50, height: 50 },
+      })
+
+      expect(restored.crop.x).toBeLessThan(0)
+      expect(Number.isFinite(restored.crop.y)).toBe(true)
+    })
+
+    test('rejects invalid geometry and zoom intervals', () => {
+      const validOptions = {
+        croppedAreaPercentages: { x: 0, y: 0, width: 50, height: 50 },
+        mediaSize: { width: 100, height: 100, naturalWidth: 100, naturalHeight: 100 },
+        cropSize: { width: 50, height: 50 },
+      }
+
+      expect(() =>
+        helpers.getInitialCropFromCroppedAreaPercentages({
+          ...validOptions,
+          cropSize: { width: 0, height: 50 },
+        }),
+      ).toThrow(RangeError)
+      expect(() =>
+        helpers.getInitialCropFromCroppedAreaPercentages({
+          ...validOptions,
+          croppedAreaPercentages: { ...validOptions.croppedAreaPercentages, width: Number.NaN },
+        }),
+      ).toThrow(RangeError)
+      expect(() =>
+        helpers.getInitialCropFromCroppedAreaPercentages({ ...validOptions, minZoom: 3, maxZoom: 2 }),
+      ).toThrow(RangeError)
+    })
+  })
+
+  describe('getInitialCropFromCroppedAreaPixels', () => {
+    test.each([0, 90, 37])('restores crop from pixels after %i degree rotation', rotation => {
+      const mediaSize = { width: 600, height: 360, naturalWidth: 1200, naturalHeight: 720 }
+      const cropSize = { width: 240, height: 160 }
+      const crop = { x: 39, y: -22 }
+      const zoom = 1.7
+      const areas = helpers.computeCroppedArea(
+        crop,
+        mediaSize,
+        cropSize,
+        cropSize.width / cropSize.height,
+        zoom,
+        rotation,
+      )
+
+      const restored = helpers.getInitialCropFromCroppedAreaPixels({
+        croppedAreaPixels: areas.croppedAreaPixels,
+        mediaSize,
+        rotation,
+        cropSize,
+      })
+
+      expect(restored.zoom).toBeCloseTo(zoom, 1)
+      expect(restored.crop.x).toBeCloseTo(crop.x, 0)
+      expect(restored.crop.y).toBeCloseTo(crop.y, 0)
+    })
+
+    test('rejects invalid pixel areas', () => {
+      expect(() =>
+        helpers.getInitialCropFromCroppedAreaPixels({
+          croppedAreaPixels: { x: 0, y: 0, width: 0, height: 10 },
+          mediaSize: { width: 100, height: 100, naturalWidth: 100, naturalHeight: 100 },
+          cropSize: { width: 50, height: 50 },
+        }),
+      ).toThrow(RangeError)
+    })
+  })
+
   describe('getCenter', () => {
     test('should simply return the center between a and b', () => {
       const center = helpers.getCenter({ x: 0, y: 0 }, { x: 100, y: 0 })

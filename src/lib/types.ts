@@ -9,6 +9,28 @@ export interface CropArea {
   height: number
 }
 
+/** Shared geometry options for restoring a crop from a previously saved area. */
+export interface InitialCropGeometryOptions {
+  mediaSize: MediaSize
+  rotation?: number
+  cropSize: Size
+  minZoom?: number
+  maxZoom?: number
+}
+
+export interface InitialCropFromPercentagesOptions extends InitialCropGeometryOptions {
+  croppedAreaPercentages: CropArea
+}
+
+export interface InitialCropFromPixelsOptions extends InitialCropGeometryOptions {
+  croppedAreaPixels: CropArea
+}
+
+export interface InitialCrop {
+  crop: Point
+  zoom: number
+}
+
 export interface OnCropCompleteEvent {
   percent: CropArea
   pixels: CropArea
@@ -24,6 +46,12 @@ export interface CropperOptions {
   aspect?: number
   minZoom?: number
   maxZoom?: number
+  /** Preferred restoration area. Takes precedence over `initialCroppedAreaPixels`. */
+  initialCroppedAreaPercentages?: CropArea
+  /** Restoration area in pixels; ignored when `initialCroppedAreaPercentages` is set. */
+  initialCroppedAreaPixels?: CropArea
+  /** Crop position adjustment in pixels for each arrow key press. */
+  keyboardStep?: number
   cropSize?: Size | null
   cropShape?: CropShape
   showGrid?: boolean

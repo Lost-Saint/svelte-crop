@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import type { CropArea, OnCropCompleteEvent } from '#lib'
 
 type TouchPoint = {
   identifier: number
@@ -6,7 +7,11 @@ type TouchPoint = {
   clientY: number
 }
 
-type TouchEventName = 'touchstart' | 'touchmove' | 'touchend'
+type TouchEventName = 'touchstart' | 'touchmove' | 'touchend' | 'touchcancel'
+type SafariGestureEventName = 'gesturestart' | 'gesturechange' | 'gestureend'
+
+type CropPayload = OnCropCompleteEvent
+type ImageMatrix = { a: number; b: number; c: number; d: number; e: number; f: number }
 
 test.describe.configure({ mode: 'parallel' })
 
@@ -30,9 +35,112 @@ async function sendTouchEvent(
   container: Locator,
   type: TouchEventName,
   points: TouchPoint[],
+  changedPoints: TouchPoint[] = points,
 ): Promise<void> {
-  const touches = type === 'touchend' ? [] : points
-  await container.dispatchEvent(type, { touches, changedTouches: touches, targetTouches: touches })
+  await container.dispatchEvent(type, {
+    touches: points,
+    changedTouches: changedPoints,
+    targetTouches: points,
+  })
+}
+
+function touchPair(centerX: number, centerY: number, angle: number, distance = 100): [TouchPoint, TouchPoint] {
+  const angleInRadians = (angle * Math.PI) / 180
+  const offsetX = (Math.cos(angleInRadians) * distance) / 2
+  const offsetY = (Math.sin(angleInRadians) * distance) / 2
+  return [
+    { identifier: 0, clientX: centerX - offsetX, clientY: centerY - offsetY },
+    { identifier: 1, clientX: centerX + offsetX, clientY: centerY + offsetY },
+  ]
+}
+
+async function touchPairAtCenter(page: Page, angle: number, distance = 100): Promise<[TouchPoint, TouchPoint]> {
+  const box = await page.getByTestId('container').boundingBox()
+  if (!box) throw new Error('Cropper container has no bounding box')
+  return touchPair(box.x + box.width / 2, box.y + box.height / 2, angle, distance)
+}
+
+async function dispatchSafariGesture(
+  page: Page,
+  type: SafariGestureEventName,
+  scale: number,
+  rotation: number,
+): Promise<boolean> {
+  return page.getByTestId('container').evaluate(
+    (element, init) => {
+      const event = new Event(init.type, { bubbles: true, cancelable: true })
+      Object.defineProperties(event, {
+        scale: { value: init.scale },
+        rotation: { value: init.rotation },
+      })
+      return !element.dispatchEvent(event)
+    },
+    { type, scale, rotation },
+  )
+}
+
+async function readImageMatrix(page: Page): Promise<ImageMatrix> {
+  return page.getByTestId('image').evaluate(element => {
+    const transform = new DOMMatrixReadOnly(getComputedStyle(element).transform)
+    return {
+      a: transform.a,
+      b: transform.b,
+      c: transform.c,
+      d: transform.d,
+      e: transform.e,
+      f: transform.f,
+    }
+  })
+}
+
+function isCropArea(value: unknown): value is CropArea {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'x' in value &&
+    typeof value.x === 'number' &&
+    'y' in value &&
+    typeof value.y === 'number' &&
+    'width' in value &&
+    typeof value.width === 'number' &&
+    'height' in value &&
+    typeof value.height === 'number'
+  )
+}
+
+function isCropPayload(value: unknown): value is CropPayload {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'percent' in value &&
+    isCropArea(value.percent) &&
+    'pixels' in value &&
+    isCropArea(value.pixels)
+  )
+}
+
+function parseCropPayload(raw: string | null): CropPayload {
+  if (raw === null) throw new Error('Crop output is missing')
+  const parsed: unknown = JSON.parse(raw)
+  if (!isCropPayload(parsed)) throw new Error('Crop output has an unexpected shape')
+  return parsed
+}
+
+async function readCropPayload(page: Page, testId = 'crop-data'): Promise<CropPayload> {
+  const output = page.getByTestId(testId)
+  await expect(output).toBeVisible()
+  return parseCropPayload(await output.textContent())
+}
+
+function expectAreaToMatch(actual: CropArea, expected: CropArea, precision = 1): void {
+  expect(actual.x).toBeCloseTo(expected.x, precision)
+  expect(actual.y).toBeCloseTo(expected.y, precision)
+  expect(actual.width).toBeCloseTo(expected.width, precision)
+  expect(actual.height).toBeCloseTo(expected.height, precision)
+}
+
+function areaQuery(area: CropArea): string {
+  return [area.x, area.y, area.width, area.height].join(',')
 }
 
 async function pinch(page: Page, distance: number): Promise<void> {
@@ -299,5 +407,260 @@ test.describe('touch interactions', () => {
     ])
     await sendTouchEvent(container, 'touchend', [])
     await expect(page.getByTestId('image')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 100, 0)')
+  })
+})
+
+test.describe('new interaction and restoration features', () => {
+  test.describe('touch rotation and gesture lifecycle', () => {
+    test.use({ hasTouch: true })
+
+    test.beforeEach(async ({ page }) => {
+      await page.goto('/e2e')
+      await expect(page.getByTestId('cropper')).toBeVisible()
+    })
+
+    test('rotates by 90 degrees with two fingers and updates crop output', async ({ page }) => {
+      const initialCrop = await readCropPayload(page)
+      const container = page.getByTestId('container')
+      const start = await touchPairAtCenter(page, 0)
+      const rotated = await touchPairAtCenter(page, 90)
+
+      await sendTouchEvent(container, 'touchstart', start)
+      await sendTouchEvent(container, 'touchmove', rotated)
+      await sendTouchEvent(container, 'touchend', [])
+
+      await expect(page.getByTestId('rotation')).toHaveText('90')
+      const matrix = await readImageMatrix(page)
+      expect(matrix.a).toBeCloseTo(0)
+      expect(matrix.b).toBeCloseTo(1)
+      expect(matrix.c).toBeCloseTo(-1)
+      expect(matrix.d).toBeCloseTo(0)
+
+      await expect
+        .poll(async () => (await readCropPayload(page)).percent.width)
+        .not.toBe(initialCrop.percent.width)
+    })
+
+    test('keeps small rotations continuous when touch angles cross either 180-degree boundary', async ({ page }) => {
+      const container = page.getByTestId('container')
+      await sendTouchEvent(container, 'touchstart', await touchPairAtCenter(page, 179))
+      await sendTouchEvent(container, 'touchmove', await touchPairAtCenter(page, -179))
+      await expect
+        .poll(async () => Number(await page.getByTestId('rotation').textContent()))
+        .toBeCloseTo(2, 1)
+      await sendTouchEvent(container, 'touchend', [])
+
+      await sendTouchEvent(container, 'touchstart', await touchPairAtCenter(page, -179))
+      await sendTouchEvent(container, 'touchmove', await touchPairAtCenter(page, 179))
+      await expect
+        .poll(async () => Number(await page.getByTestId('rotation').textContent()))
+        .toBeCloseTo(0, 1)
+      await sendTouchEvent(container, 'touchend', [])
+    })
+
+    test('transitions from a pinch to dragging with the remaining finger without a jump', async ({ page }) => {
+      const container = page.getByTestId('container')
+      const start = await touchPairAtCenter(page, 0, 100)
+      const zoomed = await touchPairAtCenter(page, 0, 120)
+      await sendTouchEvent(container, 'touchstart', start)
+      await sendTouchEvent(container, 'touchmove', zoomed)
+
+      const remainingFinger = zoomed[0]
+      const movedFinger = { ...remainingFinger, clientX: remainingFinger.clientX + 20 }
+      await sendTouchEvent(container, 'touchend', [remainingFinger], [zoomed[1]])
+      await sendTouchEvent(container, 'touchmove', [movedFinger])
+      await sendTouchEvent(container, 'touchend', [], [movedFinger])
+
+      await expect(page.getByTestId('zoom')).toHaveText('1.2')
+      await expect.poll(async () => (await readImageMatrix(page)).e).toBeCloseTo(20)
+      const matrix = await readImageMatrix(page)
+      expect(matrix.a).toBeCloseTo(1.2)
+      expect(matrix.b).toBeCloseTo(0)
+      expect(matrix.c).toBeCloseTo(0)
+      expect(matrix.d).toBeCloseTo(1.2)
+      expect(matrix.e).toBeCloseTo(20)
+      expect(matrix.f).toBeCloseTo(0)
+    })
+
+    test('clears a canceled pinch before accepting a new one-finger drag', async ({ page }) => {
+      const container = page.getByTestId('container')
+      await sendTouchEvent(container, 'touchstart', await touchPairAtCenter(page, 0, 100))
+      await sendTouchEvent(container, 'touchmove', await touchPairAtCenter(page, 45, 120))
+      await sendTouchEvent(container, 'touchcancel', [])
+
+      const matrixBeforeDrag = await readImageMatrix(page)
+      const box = await container.boundingBox()
+      if (!box) throw new Error('Cropper container has no bounding box')
+      const first = { identifier: 2, clientX: box.x + box.width / 2, clientY: box.y + box.height / 2 }
+      const next = { ...first, clientX: first.clientX + 30 }
+      await sendTouchEvent(container, 'touchstart', [first])
+      await sendTouchEvent(container, 'touchmove', [next])
+      await sendTouchEvent(container, 'touchend', [], [next])
+
+      await expect
+        .poll(async () => (await readImageMatrix(page)).e - matrixBeforeDrag.e)
+        .toBeCloseTo(30)
+      const matrixAfterDrag = await readImageMatrix(page)
+      expect(matrixAfterDrag.a).toBeCloseTo(matrixBeforeDrag.a)
+      expect(matrixAfterDrag.b).toBeCloseTo(matrixBeforeDrag.b)
+      expect(matrixAfterDrag.c).toBeCloseTo(matrixBeforeDrag.c)
+      expect(matrixAfterDrag.d).toBeCloseTo(matrixBeforeDrag.d)
+      expect(matrixAfterDrag.e - matrixBeforeDrag.e).toBeCloseTo(30)
+      expect(matrixAfterDrag.f - matrixBeforeDrag.f).toBeCloseTo(0)
+    })
+  })
+
+  test('handles Safari gesture events for zoom and rotation', async ({ page }) => {
+    await page.goto('/e2e')
+    await readCropPayload(page)
+    const initialCount = Number(await page.getByTestId('complete-count').textContent())
+
+    expect(await dispatchSafariGesture(page, 'gesturestart', 1, 0)).toBe(true)
+    expect(await dispatchSafariGesture(page, 'gesturechange', 1.5, 45)).toBe(true)
+    await expect(page.getByTestId('zoom')).toHaveText('1.5')
+    await expect(page.getByTestId('rotation')).toHaveText('45')
+    expect(await dispatchSafariGesture(page, 'gestureend', 1.5, 45)).toBe(true)
+    await expect(page.getByTestId('complete-count')).toHaveText(String(initialCount + 1))
+  })
+
+  test.describe('keyboard movement', () => {
+    test('uses one-pixel arrow steps by default and emits completion on keyup', async ({ page }) => {
+      await page.goto('/e2e')
+      const container = page.getByTestId('container')
+      await expect(container).toHaveAttribute('tabindex', '0')
+      await container.focus()
+
+      const initialCount = Number(await page.getByTestId('complete-count').textContent())
+      await page.keyboard.down('ArrowRight')
+      await expect(page.getByTestId('image')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 1, 0)')
+      await expect(page.getByTestId('complete-count')).toHaveText(String(initialCount))
+
+      await page.keyboard.up('ArrowRight')
+      await expect(page.getByTestId('complete-count')).toHaveText(String(initialCount + 1))
+    })
+
+    test('uses Shift with the configured keyboard step', async ({ page }) => {
+      await page.goto('/e2e?keyboardStep=5')
+      const container = page.getByTestId('container')
+      await expect(container).toHaveAttribute('tabindex', '0')
+      await container.focus()
+
+      await page.keyboard.press('Shift+ArrowRight')
+      await expect(page.getByTestId('image')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 1, 0)')
+    })
+
+    test('restricts keyboard movement at the crop edges', async ({ page }) => {
+      await page.goto('/e2e?keyboardStep=500')
+      const container = page.getByTestId('container')
+      await container.focus()
+
+      await page.keyboard.press('ArrowRight')
+      await expect(page.getByTestId('image')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, 193.333, 0)')
+      await page.keyboard.press('ArrowLeft')
+      await expect(page.getByTestId('image')).toHaveCSS('transform', 'matrix(1, 0, 0, 1, -193.333, 0)')
+    })
+  })
+
+  test('preserves the requested crop, zoom, and rotation during initial measurement', async ({ page }) => {
+    await page.goto('/e2e?crop=40,20&zoom=1.5&rotation=90')
+    await expect(page.getByTestId('cropper')).toBeVisible()
+    await expect(page.getByTestId('zoom')).toHaveText('1.5')
+    await expect(page.getByTestId('rotation')).toHaveText('90')
+
+    const matrix = await readImageMatrix(page)
+    expect(matrix.a).toBeCloseTo(0)
+    expect(matrix.b).toBeCloseTo(1.5)
+    expect(matrix.c).toBeCloseTo(-1.5)
+    expect(matrix.d).toBeCloseTo(0)
+    expect(matrix.e).toBeCloseTo(40)
+    expect(matrix.f).toBeCloseTo(20)
+  })
+
+  test('keeps the visible crop when only its parent is resized while zoomed and panned', async ({ page }) => {
+    await page.goto('/e2e?parentWidth=800&parentHeight=500')
+    const container = page.getByTestId('container')
+    await expect(page.getByTestId('cropper')).toBeVisible()
+    await page.mouse.move(400, 250)
+    await page.mouse.wheel(0, -100)
+    await dragImage(page, 50, 30)
+    await expect(page.getByTestId('zoom')).toHaveText('1.5')
+    const before = await readCropPayload(page, 'live-crop-data')
+    const viewport = page.viewportSize()
+
+    await page.getByTestId('resize-parent').click()
+    await expectBox(page.getByTestId('parent'), 700, 440)
+    expect(page.viewportSize()).toEqual(viewport)
+    await expect.poll(async () => Number(await page.getByTestId('zoom').textContent())).toBeGreaterThan(1.4)
+    await expect
+      .poll(async () => (await readCropPayload(page, 'live-crop-data')).percent.width)
+      .toBeCloseTo(before.percent.width, 0)
+
+    const after = await readCropPayload(page, 'live-crop-data')
+    expectAreaToMatch(after.percent, before.percent, 0)
+    await expect(container).toBeVisible()
+  })
+
+  test('initializes after a hidden parent becomes visible', async ({ page }) => {
+    await page.goto('/e2e?hidden=1&parentWidth=800&parentHeight=500')
+    await expect(page.getByTestId('parent')).toBeHidden()
+    await expect(page.getByTestId('cropper')).toHaveCount(0)
+
+    await page.getByTestId('toggle-visible').click()
+    await expect(page.getByTestId('cropper')).toBeVisible()
+    await expect(page.getByTestId('crop-data')).toContainText('percent')
+    await expectBox(page.getByTestId('image'), 800, 419)
+  })
+
+  test('restores a saved percentage crop after remounting a rotated image', async ({ page }) => {
+    await page.goto('/e2e?rotation=90')
+    await expect(page.getByTestId('cropper')).toBeVisible()
+    const initialCrop = await readCropPayload(page)
+    await page.mouse.move(640, 360)
+    await page.mouse.wheel(0, -100)
+    await dragImage(page, 50, 30)
+    await expect(page.getByTestId('zoom')).toHaveText('1.5')
+    await expect
+      .poll(async () => JSON.stringify(await readCropPayload(page)))
+      .not.toBe(JSON.stringify(initialCrop))
+    const saved = await readCropPayload(page)
+
+    await page.goto(`/e2e?rotation=90&percent=${encodeURIComponent(areaQuery(saved.percent))}`)
+    await expect(page.getByTestId('cropper')).toBeVisible()
+    const restored = await readCropPayload(page)
+    expectAreaToMatch(restored.percent, saved.percent)
+  })
+
+  test('gives saved percentages precedence over conflicting pixels', async ({ page }) => {
+    await page.goto('/e2e')
+    const percentageCrop = await readCropPayload(page)
+    const conflictingPixels: CropArea = {
+      ...percentageCrop.pixels,
+      x: percentageCrop.pixels.x + 100,
+    }
+    expect(conflictingPixels.x).not.toBe(percentageCrop.pixels.x)
+
+    await page.goto(
+      `/e2e?percent=${encodeURIComponent(areaQuery(percentageCrop.percent))}&pixels=${encodeURIComponent(areaQuery(conflictingPixels))}`,
+    )
+    const restored = await readCropPayload(page)
+    expectAreaToMatch(restored.percent, percentageCrop.percent)
+  })
+
+  test('restores a saved pixel crop after remounting rotated video', async ({ page }) => {
+    await page.goto('/e2e?video=1&rotation=90')
+    const video = page.getByTestId('video')
+    await expect(video).toBeVisible()
+    await expect
+      .poll(() => video.evaluate(element => (element instanceof HTMLVideoElement ? element.videoWidth : 0)))
+      .toBeGreaterThan(0)
+    const saved = await readCropPayload(page)
+
+    await page.goto(`/e2e?video=1&rotation=90&pixels=${encodeURIComponent(areaQuery(saved.pixels))}`)
+    await expect(video).toBeVisible()
+    await expect
+      .poll(() => video.evaluate(element => (element instanceof HTMLVideoElement ? element.videoWidth : 0)))
+      .toBeGreaterThan(0)
+    const restored = await readCropPayload(page)
+    expectAreaToMatch(restored.pixels, saved.pixels, 0)
   })
 })

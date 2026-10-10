@@ -1,4 +1,13 @@
-import type { CropArea, MediaSize, Point, Size } from './types.js'
+import type {
+  CropArea,
+  InitialCrop,
+  InitialCropFromPercentagesOptions,
+  InitialCropFromPixelsOptions,
+  InitialCropGeometryOptions,
+  MediaSize,
+  Point,
+  Size,
+} from './types.js'
 
 // NOTE: helpers keep positional parameters intentionally. They run inside
 // requestAnimationFrame drag/zoom handlers (hot paths), where the
@@ -173,6 +182,131 @@ export function computeCroppedArea(
     ),
   }
   return { croppedAreaPercentages, croppedAreaPixels }
+}
+
+/**
+ * Restore the crop position and zoom from a previously reported percentage area.
+ * The area is measured against the rotated media bounds, matching
+ * `computeCroppedArea`.
+ */
+export function getInitialCropFromCroppedAreaPercentages({
+  croppedAreaPercentages,
+  mediaSize,
+  rotation = 0,
+  cropSize,
+  minZoom = 1,
+  maxZoom = 3,
+}: InitialCropFromPercentagesOptions): InitialCrop {
+  validateInitialCropInputs(
+    { mediaSize, rotation, cropSize, minZoom, maxZoom },
+    croppedAreaPercentages,
+  )
+
+  const mediaBBoxSize = rotateSize(mediaSize.width, mediaSize.height, rotation)
+  validatePositiveFiniteSize(mediaBBoxSize, 'rotated media size')
+
+  const requestedZoom = ((cropSize.width / mediaBBoxSize.width) * 100) / croppedAreaPercentages.width
+  assertFiniteNumber(requestedZoom, 'requested zoom')
+  const zoom = clamp(requestedZoom, minZoom, maxZoom)
+
+  const scaledMediaWidth = mediaBBoxSize.width * zoom
+  const scaledMediaHeight = mediaBBoxSize.height * zoom
+  const crop = {
+    x:
+      scaledMediaWidth / 2 -
+      cropSize.width / 2 -
+      (scaledMediaWidth * croppedAreaPercentages.x) / 100,
+    y:
+      scaledMediaHeight / 2 -
+      cropSize.height / 2 -
+      (scaledMediaHeight * croppedAreaPercentages.y) / 100,
+  }
+
+  assertFiniteNumber(crop.x, 'crop.x')
+  assertFiniteNumber(crop.y, 'crop.y')
+  assertFiniteNumber(zoom, 'zoom')
+  return { crop, zoom }
+}
+
+/**
+ * Restore the crop position and zoom from a previously reported pixel area.
+ * Pixel coordinates are measured against the rotated natural media bounds,
+ * matching `computeCroppedArea`.
+ */
+export function getInitialCropFromCroppedAreaPixels({
+  croppedAreaPixels,
+  mediaSize,
+  rotation = 0,
+  cropSize,
+  minZoom = 1,
+  maxZoom = 3,
+}: InitialCropFromPixelsOptions): InitialCrop {
+  validateInitialCropInputs(
+    { mediaSize, rotation, cropSize, minZoom, maxZoom },
+    croppedAreaPixels,
+  )
+
+  const mediaNaturalBBoxSize = rotateSize(mediaSize.naturalWidth, mediaSize.naturalHeight, rotation)
+  validatePositiveFiniteSize(mediaNaturalBBoxSize, 'rotated natural media size')
+
+  const croppedAreaPercentages = {
+    x: (croppedAreaPixels.x / mediaNaturalBBoxSize.width) * 100,
+    y: (croppedAreaPixels.y / mediaNaturalBBoxSize.height) * 100,
+    width: (croppedAreaPixels.width / mediaNaturalBBoxSize.width) * 100,
+    height: (croppedAreaPixels.height / mediaNaturalBBoxSize.height) * 100,
+  }
+
+  return getInitialCropFromCroppedAreaPercentages({
+    croppedAreaPercentages,
+    mediaSize,
+    rotation,
+    cropSize,
+    minZoom,
+    maxZoom,
+  })
+}
+
+function validateInitialCropInputs(
+  { mediaSize, rotation = 0, cropSize, minZoom = 1, maxZoom = 3 }: InitialCropGeometryOptions,
+  area: CropArea,
+): void {
+  validatePositiveFiniteSize(mediaSize, 'media size')
+  validatePositiveFiniteSize(cropSize, 'crop size')
+  validatePositiveFiniteSize(
+    { width: mediaSize.naturalWidth, height: mediaSize.naturalHeight },
+    'natural media size',
+  )
+  assertFiniteNumber(rotation, 'rotation')
+  validateCropArea(area, 'cropped area')
+  validatePositiveFiniteNumber(minZoom, 'minZoom')
+  validatePositiveFiniteNumber(maxZoom, 'maxZoom')
+  if (minZoom > maxZoom) {
+    throw new RangeError('minZoom must be less than or equal to maxZoom')
+  }
+}
+
+function validateCropArea(area: CropArea, name: string): void {
+  assertFiniteNumber(area.x, `${name}.x`)
+  assertFiniteNumber(area.y, `${name}.y`)
+  validatePositiveFiniteNumber(area.width, `${name}.width`)
+  validatePositiveFiniteNumber(area.height, `${name}.height`)
+}
+
+function validatePositiveFiniteSize(size: Size, name: string): void {
+  validatePositiveFiniteNumber(size.width, `${name}.width`)
+  validatePositiveFiniteNumber(size.height, `${name}.height`)
+}
+
+function validatePositiveFiniteNumber(value: number, name: string): void {
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new RangeError(`${name} must be a finite positive number`)
+  }
+}
+
+function assertFiniteNumber(value: number, name: string): void {
+  if (!Number.isFinite(value)) {
+    throw new RangeError(`${name} must be finite`)
+  }
 }
 
 /**

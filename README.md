@@ -19,7 +19,9 @@ This is a rewrite of `react-easy-crop` (https://github.com/valentinh/react-easy-
 ## Features
 
 - Supports drag and zoom interactions
-- Supports pinch zoom, rotation, and video sources
+- Supports pinch zoom, two-finger rotation, and video sources
+- Supports arrow-key cropping and restoring saved crops
+- Recalculates the crop when its container resizes
 - Provides crop dimensions as pixels and percentages
 - Supports any images format (JPEG, PNG, even GIF) as url or base 64 string
 - Emits live crop area updates while cropping
@@ -67,7 +69,11 @@ npm install svelte-easy-crop --save
 | `video`            | `string \| { src: string, type?: string }[]` | one of the two | Video URL or source list. Video playback is muted, looping, and inline.                                                                                                                                                                                                                         |
 | `crop`             | `{ x: number, y: number }`          |          | Position of the media. `{ x: 0, y: 0 }` centers it under the crop area.                                                                                                                                                                                                                                     |
 | `zoom`             | number                              |          | Zoom of the media between `minZoom` and `maxZoom`. Defaults to 1.                                                                                                                                                                                                                                           |
-| `rotation`         | number                              |          | Rotation in degrees. Defaults to 0. Can be bound to update it from user controls.                                                                                                                                                                                                                            |
+| `rotation`         | number                              |          | Rotation in degrees. Defaults to 0. Use `bind:rotation` to receive changes from touch and trackpad rotation gestures. |
+| `keyboardStep`     | number                              |          | Distance in CSS pixels moved by each arrow-key press. Defaults to 1. Hold Shift for a step one fifth as large. |
+| `tabindex`         | number                              |          | Defaults to 0 so the cropper can receive keyboard focus. Use -1 to remove it from sequential keyboard navigation. |
+| `initialCroppedAreaPercentages` | `CropArea`              |          | Restores a saved percentage crop when media loads. Takes precedence over `initialCroppedAreaPixels`. |
+| `initialCroppedAreaPixels` | `CropArea`                   |          | Restores a saved pixel crop when media loads. Percentage crops avoid drift caused by rounded pixel output. |
 | `aspect`           | number                              |          | Aspect of the cropper. The value is the ratio between its width and its height. The default value is `4/3`.                                                                                                                                                                                                 |
 | `minZoom`          | number                              |          | Minimum zoom of the media. Defaults to 1.                                                                                                                                                                                                                                                                   |
 | `maxZoom`          | number                              |          | Maximum zoom of the media. Defaults to 3.                                                                                                                                                                                                                                                                   |
@@ -79,6 +85,42 @@ npm install svelte-easy-crop --save
 | `restrictPosition` | boolean                             |          | Whether the position of the media should be restricted to the boundaries of the cropper.                                                                                                                                                                                                                   |
 | `oncropcomplete`   | function(details)                    |          | Called when media loads and after an interaction settles. Use this callback to save the cropped area.                                                                                                                                                                                                        |
 | `oncropareachange` | function(details)                    |          | Called whenever crop, zoom, rotation, or media dimensions change. It has the same `{ percent, pixels }` payload as `oncropcomplete`.                                                                                                                                                                         |
+
+## Restoring a saved crop
+
+Save the `percent` value from `oncropcomplete` and pass it back when reopening the editor. Save `rotation` separately and supply it with the saved area.
+
+```svelte
+<Cropper
+  {image}
+  bind:crop
+  bind:zoom
+  bind:rotation
+  initialCroppedAreaPercentages={savedArea}
+/>
+```
+
+Initial crop props are applied when the media loads. Changing these props alone does not reset an active edit. A container resize preserves the current selection where the zoom limits and position restrictions allow it, without reapplying the initial crop.
+
+For an explicit restore during editing, the package exports `getInitialCropFromCroppedAreaPercentages` and `getInitialCropFromCroppedAreaPixels`. Both accept an options object and return `{ crop, zoom }`:
+
+```ts
+import { getInitialCropFromCroppedAreaPercentages } from 'svelte-easy-crop'
+
+const restored = getInitialCropFromCroppedAreaPercentages({
+  croppedAreaPercentages: savedArea,
+  mediaSize, // { width, height, naturalWidth, naturalHeight }
+  cropSize, // { width, height }
+  rotation,
+  minZoom: 1,
+  maxZoom: 3,
+})
+
+crop = restored.crop
+zoom = restored.zoom
+```
+
+The pixel helper uses `croppedAreaPixels` instead. The helpers default to rotation 0 and zoom limits 1–3. They reject non-finite values, non-positive dimensions, and invalid zoom limits with `RangeError`.
 
 ## Callbacks
 
