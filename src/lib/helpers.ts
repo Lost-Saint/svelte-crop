@@ -1,4 +1,8 @@
-import type { ImageSize, Point, Size } from './types.js'
+import type { CropArea, ImageSize, Point, Size } from './types.js'
+
+// NOTE: helpers keep positional parameters intentionally. They run inside
+// requestAnimationFrame drag/zoom handlers (hot paths), where the
+// typescript-best-practices "object args" rule is explicitly skipped.
 
 /**
  * Compute the dimension of the crop area based on image size and aspect ratio
@@ -6,7 +10,7 @@ import type { ImageSize, Point, Size } from './types.js'
  * @param imgHeight height of the src image in pixels
  * @param aspect aspect ratio of the crop
  */
-export function getCropSize(imgWidth: number, imgHeight: number, aspect: number) {
+export function getCropSize(imgWidth: number, imgHeight: number, aspect: number): Size {
   if (imgWidth >= imgHeight * aspect) {
     return {
       width: imgHeight * aspect,
@@ -44,7 +48,7 @@ function restrictPositionCoord(
   imageSize: number,
   cropSize: number,
   zoom: number
-) {
+): number {
   // Default max position calculation
   const maxPosition = Math.abs((imageSize * zoom) / 2 - cropSize / 2)
 
@@ -52,8 +56,8 @@ function restrictPositionCoord(
   return Math.min(maxPosition, Math.max(position, -maxPosition))
 }
 
-export function getDistanceBetweenPoints(pointA: Point, pointB: Point) {
-  return Math.sqrt(Math.pow(pointA.y - pointB.y, 2) + Math.pow(pointA.x - pointB.x, 2))
+export function getDistanceBetweenPoints(pointA: Point, pointB: Point): number {
+  return Math.hypot(pointA.x - pointB.x, pointA.y - pointB.y)
 }
 
 /**
@@ -73,7 +77,7 @@ export function computeCroppedArea(
   aspect: number,
   zoom: number,
   restrictPosition = true
-) {
+): { croppedAreaPercentages: CropArea; croppedAreaPixels: CropArea } {
   const limitAreaFn = restrictPosition ? limitArea : noOp
   const croppedAreaPercentages = {
     x: limitAreaFn(
@@ -136,12 +140,12 @@ export function computeCroppedArea(
  * @param value
  * @param shouldRound
  */
-function limitArea(max: number, value: number, shouldRound = false) {
+function limitArea(max: number, value: number, shouldRound = false): number {
   const v = shouldRound ? Math.round(value) : value
   return Math.min(max, Math.max(0, v))
 }
 
-function noOp(max: number, value: number) {
+function noOp(_max: number, value: number): number {
   return value
 }
 
@@ -150,7 +154,7 @@ function noOp(max: number, value: number) {
  * @param a
  * @param b
  */
-export function getCenter(a: Point, b: Point) {
+export function getCenter(a: Point, b: Point): Point {
   return {
     x: (b.x + a.x) / 2,
     y: (b.y + a.y) / 2,

@@ -1,21 +1,32 @@
 <script lang="ts">
 	import Cropper from '#lib'
-	import queryString from 'query-string'
+	import type { OnCropCompleteEvent } from '#lib'
+	import { page } from '$app/state'
 
 	let crop = $state({ x: 0, y: 0 })
 	let zoom = $state(1)
-	let minZoom = $state(0.5)
-	let maxZoom = $state(3)
+	const minZoom = 0.5
+	const maxZoom = 3
+	let lastCrop = $state.raw<OnCropCompleteEvent | null>(null)
 
-	const urlArgs = typeof window !== 'undefined' ? queryString.parse(window.location.search) : null
-	let image = typeof urlArgs?.img === 'string' ? urlArgs.img : '/images/dog.jpeg' // so we can change the image from our tests
+	// Derived from SvelteKit page state — reactive, SSR-safe, no window check needed.
+	// ?img=... override keeps the e2e hook; defaults to the demo image.
+	let image = $derived(page.url.searchParams.get('img') ?? '/images/dog.jpeg')
+
+	const handleCropComplete = (event: OnCropCompleteEvent): void => {
+		lastCrop = event
+	}
 </script>
 
 <Cropper
 	{image}
+	{minZoom}
+	{maxZoom}
 	bind:crop
 	bind:zoom
-	bind:minZoom
-	bind:maxZoom
-	oncropcomplete={e => console.log(e)}
+	oncropcomplete={handleCropComplete}
 />
+
+{#if lastCrop}
+	<pre data-testid="crop-data">{JSON.stringify(lastCrop)}</pre>
+{/if}

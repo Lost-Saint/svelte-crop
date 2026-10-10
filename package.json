@@ -64,7 +64,7 @@
     "vitest": "^4.1.8"
   },
   "peerDependencies": {
-    "svelte": "^5.0.0"
+    "svelte": "^5.29.0"
   },
   "type": "module",
   "svelte": "./dist/index.js",
