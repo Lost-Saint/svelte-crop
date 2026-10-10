@@ -1,6 +1,6 @@
 {
   "name": "svelte-crop",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "A Svelte component to crop images with easy interactions",
   "homepage": "https://github.com/Lost-Saint/svelte-crop",
   "repository": {
