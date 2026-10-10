@@ -1,15 +1,28 @@
-.DS_Store
 node_modules
-/build
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
 /.svelte-kit
+/build
 /dist
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
 .env
 .env.*
 !.env.example
+!.env.test
+
+# Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
-cypress/fixtures
-cypress/videos
-cypress/screenshots
-yarn-error.log
-package-lock.json
+
+# Playwright
+playwright-report
+test-results

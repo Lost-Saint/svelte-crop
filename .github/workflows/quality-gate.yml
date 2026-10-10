@@ -7,30 +7,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare repository
-        run: git fetch --unshallow --tags
-
-      - name: Use Node.js 18.x
+      - name: Use Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 18.x
-
-      - name: Cache node modules
-        uses: actions/cache@v4
+          node-version: 22
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          path: node_modules
-          key: yarn-deps-${{ hashFiles('yarn.lock') }}
-          restore-keys: |
-            yarn-deps-${{ hashFiles('yarn.lock') }}
-      - run: yarn install --frozen-lockfile
+          bun-version: 1.4.2
+      - run: bun install --frozen-lockfile
+      - name: Install Playwright browser
+        run: bunx playwright install --with-deps chromium
+      - name: Check types and Svelte components
+        run: bun run check
+      - name: Lint and format check
+        run: bun run lint
+      - name: Build package
+        run: bun run build
       - name: Run unit tests
-        run: yarn unit
-
-      - name: Cypress run
-        uses: cypress-io/github-action@v6
-        with:
-          build: yarn build
-          start: yarn dev
-          record: true
-        env:
-          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+        run: bun run unit
+      - name: Run Playwright tests
+        run: bun run e2e

@@ -108,11 +108,11 @@ const area = {
 ## Development
 
 ```shell
-yarn
-yarn dev
+bun install
+bun run dev
 ```
 
-Now, open `http://localhost:5000` and start hacking!
+Open `http://localhost:3000` to use the demo. Install the Playwright browser once with `bunx playwright install chromium`, then run browser tests with `bun run e2e`. Run `bun run unit` for helper tests, `bun run lint` for ESLint and dprint, and `bun run check` for Svelte and TypeScript diagnostics.
 
 ## License
 
