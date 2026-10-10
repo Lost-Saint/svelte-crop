@@ -3,7 +3,16 @@
 	import type { Attachment } from 'svelte/attachments'
 	import { on } from 'svelte/events'
 	import * as helpers from './helpers.js'
-	import type { CropArea, MediaSize, OnCropCompleteEvent, Props, VideoSrc } from './types.js'
+	import type {
+		CropArea,
+		InitialCrop,
+		MediaSize,
+		OnCropCompleteEvent,
+		Point,
+		Props,
+		Size,
+		VideoSrc,
+	} from './types.js'
 
 	// crop, zoom, and rotation are bindable because interactions update them.
 	let {
@@ -31,21 +40,25 @@
 
 	let mediaSize = $state.raw<MediaSize | null>(null)
 	let containerRect = $state.raw<DOMRect | null>(null)
-	// Derived from props + measured media/container sizes.
-	let cropperSize = $derived.by(() => {
-		if (!mediaSize || !containerRect) return null
-		return (
-			cropSize
-				?? helpers.getCropSize(
-					mediaSize.width,
-					mediaSize.height,
-					containerRect.width,
-					containerRect.height,
-					aspect,
-					rotation,
-				)
+
+	const getCropSizeFor = (
+		nextMediaSize: MediaSize,
+		nextContainerRect: DOMRect,
+		nextRotation = rotation,
+	): Size =>
+		cropSize ?? helpers.getCropSize(
+			nextMediaSize.width,
+			nextMediaSize.height,
+			nextContainerRect.width,
+			nextContainerRect.height,
+			aspect,
+			nextRotation,
 		)
-	})
+
+	// Derived from props + measured media/container sizes.
+	let cropperSize = $derived(
+		mediaSize && containerRect ? getCropSizeFor(mediaSize, containerRect) : null,
+	)
 	let aspectValue = $derived(cropSize ? cropSize.width / cropSize.height : aspect)
 	let transform = $derived(
 		`translate(${crop.x}px, ${crop.y}px) rotate(${rotation}deg) scale(${zoom})`,
@@ -96,8 +109,8 @@
 
 	function getMediaSourceKey(): string {
 		return video !== undefined
-			? JSON.stringify(['video', videoSources.map(({ src, type }) => [src, type])]) ?? ''
-			: JSON.stringify(['image', image]) ?? ''
+			? JSON.stringify(['video', videoSources.map(({ src, type }) => [src, type])])
+			: JSON.stringify(['image', image])
 	}
 
 	const resetMediaLoad = (): void => {
@@ -154,66 +167,56 @@
 		}
 	}
 
-	const getCropSizeFor = (
-		nextMediaSize: MediaSize,
-		nextContainerRect: DOMRect,
-		nextRotation = rotation,
-	): { width: number; height: number } =>
-		cropSize ?? helpers.getCropSize(
-			nextMediaSize.width,
-			nextMediaSize.height,
-			nextContainerRect.width,
-			nextContainerRect.height,
-			aspect,
-			nextRotation,
-		)
-
-	const hasPositiveSize = (size: { width: number; height: number }): boolean =>
+	const hasPositiveSize = (size: Size): boolean =>
 		Number.isFinite(size.width) && size.width > 0 && Number.isFinite(size.height)
 		&& size.height > 0
 
-	const applyInitialCrop = (
+	const applyRestoredCrop = (
+		restored: InitialCrop,
 		nextMediaSize: MediaSize,
-		nextCropSize: { width: number; height: number },
+		nextCropSize: Size,
+		nextRotation: number,
 	): void => {
+		zoom = restored.zoom
+		crop = restrictPosition
+			? helpers.restrictPosition(
+				restored.crop,
+				nextMediaSize,
+				nextCropSize,
+				restored.zoom,
+				nextRotation,
+			)
+			: restored.crop
+	}
+
+	const applyInitialCrop = (nextMediaSize: MediaSize, nextCropSize: Size): void => {
+		const geometry = {
+			mediaSize: nextMediaSize,
+			rotation,
+			cropSize: nextCropSize,
+			minZoom,
+			maxZoom,
+		}
 		if (initialCroppedAreaPercentages) {
-			const restored = helpers.getInitialCropFromCroppedAreaPercentages({
-				croppedAreaPercentages: initialCroppedAreaPercentages,
-				mediaSize: nextMediaSize,
+			applyRestoredCrop(
+				helpers.getInitialCropFromCroppedAreaPercentages({
+					...geometry,
+					croppedAreaPercentages: initialCroppedAreaPercentages,
+				}),
+				nextMediaSize,
+				nextCropSize,
 				rotation,
-				cropSize: nextCropSize,
-				minZoom,
-				maxZoom,
-			})
-			zoom = restored.zoom
-			crop = restrictPosition
-				? helpers.restrictPosition(
-					restored.crop,
-					nextMediaSize,
-					nextCropSize,
-					restored.zoom,
-					rotation,
-				)
-				: restored.crop
+			)
 		} else if (initialCroppedAreaPixels) {
-			const restored = helpers.getInitialCropFromCroppedAreaPixels({
-				croppedAreaPixels: initialCroppedAreaPixels,
-				mediaSize: nextMediaSize,
+			applyRestoredCrop(
+				helpers.getInitialCropFromCroppedAreaPixels({
+					...geometry,
+					croppedAreaPixels: initialCroppedAreaPixels,
+				}),
+				nextMediaSize,
+				nextCropSize,
 				rotation,
-				cropSize: nextCropSize,
-				minZoom,
-				maxZoom,
-			})
-			zoom = restored.zoom
-			crop = restrictPosition
-				? helpers.restrictPosition(
-					restored.crop,
-					nextMediaSize,
-					nextCropSize,
-					restored.zoom,
-					rotation,
-				)
-				: restored.crop
+			)
 		}
 	}
 
@@ -301,24 +304,19 @@
 
 		if (initialCropAppliedForLoad && geometryChanged) {
 			if (previousArea && hasPositiveSize(previousArea)) {
-				const restored = helpers.getInitialCropFromCroppedAreaPercentages({
-					croppedAreaPercentages: previousArea,
-					mediaSize: nextMediaSize,
-					rotation,
-					cropSize: nextCropSize,
-					minZoom,
-					maxZoom,
-				})
-				zoom = restored.zoom
-				crop = restrictPosition
-					? helpers.restrictPosition(
-						restored.crop,
-						nextMediaSize,
-						nextCropSize,
-						restored.zoom,
+				applyRestoredCrop(
+					helpers.getInitialCropFromCroppedAreaPercentages({
+						croppedAreaPercentages: previousArea,
+						mediaSize: nextMediaSize,
 						rotation,
-					)
-					: restored.crop
+						cropSize: nextCropSize,
+						minZoom,
+						maxZoom,
+					}),
+					nextMediaSize,
+					nextCropSize,
+					rotation,
+				)
 				lastValidAreaPercentages = previousArea
 			} else if (restrictPosition) {
 				crop = helpers.restrictPosition(crop, nextMediaSize, nextCropSize, zoom, rotation)
@@ -632,16 +630,15 @@
 		}, 250)
 	}
 
+	const ARROW_DELTAS: Record<string, Point | undefined> = {
+		ArrowLeft: { x: -1, y: 0 },
+		ArrowRight: { x: 1, y: 0 },
+		ArrowUp: { x: 0, y: -1 },
+		ArrowDown: { x: 0, y: 1 },
+	}
+
 	const onKeyDown = (e: KeyboardEvent): void => {
-		const delta = e.key === 'ArrowLeft'
-			? { x: -1, y: 0 }
-			: e.key === 'ArrowRight'
-			? { x: 1, y: 0 }
-			: e.key === 'ArrowUp'
-			? { x: 0, y: -1 }
-			: e.key === 'ArrowDown'
-			? { x: 0, y: 1 }
-			: null
+		const delta = ARROW_DELTAS[e.key]
 		if (!delta) return
 
 		e.preventDefault()
