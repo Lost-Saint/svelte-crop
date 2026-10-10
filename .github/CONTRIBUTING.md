@@ -23,7 +23,7 @@ To install the project you need to have `bun` and `node`
 > pull requests from branches on your fork. To do this, run:
 >
 > ```
-> git remote add upstream git@github.com:ricardo-ch/svelte-easy-crop.git
+> git remote add upstream git@github.com:Lost-Saint/svelte-crop.git
 > git fetch upstream
 > git branch --set-upstream-to=upstream/master master
 > ```
