@@ -34,12 +34,21 @@
 	const initialPercent = parseArea(params.get('percent'))
 	const initialPixels = parseArea(params.get('pixels'))
 	const keyboardStep = parseNumber(params.get('keyboardStep'))
+	const requestedObjectFit = params.get('objectFit')
+	const objectFit = requestedObjectFit === 'contain'
+			|| requestedObjectFit === 'cover'
+			|| requestedObjectFit === 'horizontal-cover'
+			|| requestedObjectFit === 'vertical-cover'
+		? requestedObjectFit
+		: undefined
 	const cropperOptions: CropperOptions = {
 		minZoom: 0.5,
 		maxZoom: 3,
 		...(initialPercent ? { initialCroppedAreaPercentages: initialPercent } : {}),
 		...(initialPixels ? { initialCroppedAreaPixels: initialPixels } : {}),
 		...(keyboardStep === undefined ? {} : { keyboardStep }),
+		...(objectFit === undefined ? {} : { objectFit }),
+		...(params.get('zoomWithScroll') === '0' ? { zoomWithScroll: false } : {}),
 	}
 
 	let crop = $state(parsePoint(params.get('crop')) ?? { x: 0, y: 0 })
@@ -47,6 +56,8 @@
 	let rotation = $state(parseNumber(params.get('rotation')) ?? 0)
 	let lastCrop = $state.raw<OnCropCompleteEvent | null>(null)
 	let liveCrop = $state.raw<OnCropCompleteEvent | null>(null)
+	let loadedMediaSize = $state.raw<{ width: number; height: number } | null>(null)
+	let loadedCount = $state(0)
 	let completeCount = $state(0)
 	let visible = $state(params.get('hidden') !== '1')
 	let parentWidth = $state(parseNumber(params.get('parentWidth')) ?? 1280)
@@ -62,6 +73,11 @@
 
 	const handleCropAreaChange = (event: OnCropCompleteEvent): void => {
 		liveCrop = event
+	}
+
+	const handleMediaLoaded = (mediaSize: { width: number; height: number }): void => {
+		loadedMediaSize = { width: mediaSize.width, height: mediaSize.height }
+		loadedCount += 1
 	}
 
 	const resizeParent = (): void => {
@@ -86,6 +102,7 @@
 			bind:rotation
 			oncropcomplete={handleCropComplete}
 			oncropareachange={handleCropAreaChange}
+			onMediaLoaded={handleMediaLoaded}
 		/>
 	{:else}
 		<Cropper
@@ -96,6 +113,7 @@
 			bind:rotation
 			oncropcomplete={handleCropComplete}
 			oncropareachange={handleCropAreaChange}
+			onMediaLoaded={handleMediaLoaded}
 		/>
 	{/if}
 </div>
@@ -111,6 +129,10 @@
 <output data-testid="zoom">{zoom}</output>
 <output data-testid="crop-position">{JSON.stringify(crop)}</output>
 <output data-testid="complete-count">{completeCount}</output>
+{#if loadedMediaSize}
+	<output data-testid="media-size">{JSON.stringify(loadedMediaSize)}</output>
+{/if}
+<output data-testid="media-loaded-count">{loadedCount}</output>
 
 {#if lastCrop}
 	<pre data-testid="crop-data">{JSON.stringify(lastCrop)}</pre>
@@ -162,6 +184,14 @@ pre {
 
 [data-testid="complete-count"] {
 	top: 4.5rem;
+}
+
+[data-testid="media-size"] {
+	top: 6rem;
+}
+
+[data-testid="media-loaded-count"] {
+	top: 8rem;
 }
 
 pre {

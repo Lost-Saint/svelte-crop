@@ -2,6 +2,18 @@ import type { HTMLImgAttributes } from 'svelte/elements'
 
 export type CropShape = 'rect' | 'round'
 
+/**
+ * How the media is fitted inside the cropper.
+ * - `contain`: the media is fully visible inside the cropper.
+ * - `horizontal-cover`: the media fills the cropper width.
+ * - `vertical-cover`: the media fills the cropper height.
+ * - `cover`: `horizontal-cover` or `vertical-cover`, whichever keeps the media fully visible.
+ */
+export type ObjectFit = 'contain' | 'cover' | 'horizontal-cover' | 'vertical-cover'
+
+/** `cover` resolved against the current media and container aspect ratios. */
+export type ResolvedObjectFit = Exclude<ObjectFit, 'cover'>
+
 export interface CropArea {
   x: number
   y: number
@@ -38,6 +50,8 @@ export interface OnCropCompleteEvent {
 
 export type OnCropComplete = (event: OnCropCompleteEvent) => void
 export type OnCropAreaChange = (event: OnCropCompleteEvent) => void
+/** Called once per media source after it loads and its rendered size is measured. */
+export type OnMediaLoaded = (mediaSize: MediaSize) => void
 
 export interface CropperOptions {
   crop?: Point
@@ -54,8 +68,12 @@ export interface CropperOptions {
   keyboardStep?: number
   cropSize?: Size | null
   cropShape?: CropShape
+  /** How the media is fitted inside the cropper. Defaults to `contain`. */
+  objectFit?: ObjectFit
   showGrid?: boolean
   zoomSpeed?: number
+  /** Whether the wheel zooms the media. Defaults to `true`. */
+  zoomWithScroll?: boolean
   crossOrigin?: HTMLImgAttributes['crossorigin']
   restrictPosition?: boolean
   tabindex?: number
@@ -67,6 +85,8 @@ export interface CropperOptions {
    * synchronously from this callback (infinite loop).
    */
   oncropareachange?: OnCropAreaChange
+  /** Called once per media source after it loads and its rendered size is measured. */
+  onMediaLoaded?: OnMediaLoaded
 }
 
 /** Provide exactly one media source. */

@@ -664,3 +664,63 @@ test.describe('new interaction and restoration features', () => {
     expectAreaToMatch(restored.pixels, saved.pixels, 0)
   })
 })
+
+test.describe('object fit', () => {
+  test('contain keeps the whole media visible', async ({ page }) => {
+    await page.goto('/e2e?objectFit=contain&parentWidth=480&parentHeight=360')
+    await expectBox(page.getByTestId('image'), 480, 251)
+    await expect(page.getByTestId('media-size')).toHaveText('{"width":480,"height":251}')
+  })
+
+  test('horizontal-cover fills the cropper width', async ({ page }) => {
+    await page.goto('/e2e?objectFit=horizontal-cover&parentWidth=480&parentHeight=360')
+    await expect(page.getByTestId('image')).toHaveClass(/cover-horizontal/)
+    await expectBox(page.getByTestId('image'), 480, 251)
+  })
+
+  test('vertical-cover fills the cropper height', async ({ page }) => {
+    await page.goto('/e2e?objectFit=vertical-cover&parentWidth=480&parentHeight=360')
+    await expect(page.getByTestId('image')).toHaveClass(/cover-vertical/)
+    await expectBox(page.getByTestId('image'), 688, 360)
+  })
+
+  test('cover resolves against the media and container aspect', async ({ page }) => {
+    // dog.jpeg is wider than the 480x360 container, so cover fills the height.
+    await page.goto('/e2e?objectFit=cover&parentWidth=480&parentHeight=360')
+    await expect(page.getByTestId('image')).toHaveClass(/cover-vertical/)
+    await expectBox(page.getByTestId('image'), 688, 360)
+
+    // In a wide, short container cover fills the width instead.
+    await page.goto('/e2e?objectFit=cover&parentWidth=1280&parentHeight=400')
+    await expect(page.getByTestId('image')).toHaveClass(/cover-horizontal/)
+    await expectBox(page.getByTestId('image'), 1280, 670)
+  })
+})
+
+test.describe('onMediaLoaded', () => {
+  test('reports the rendered media size once per source', async ({ page }) => {
+    await page.goto('/e2e?objectFit=vertical-cover&parentWidth=480&parentHeight=360')
+    await expect(page.getByTestId('media-size')).toHaveText(
+      '{"width":687.6,"height":360}',
+    )
+    await expect(page.getByTestId('media-loaded-count')).toHaveText('1')
+  })
+})
+
+test.describe('zoomWithScroll', () => {
+  test('zooms with the wheel by default', async ({ page }) => {
+    await page.goto('/e2e?parentWidth=480&parentHeight=360')
+    await expect(page.getByTestId('zoom')).toHaveText('1')
+    await page.mouse.move(240, 180)
+    await page.mouse.wheel(0, -400)
+    await expect(page.getByTestId('zoom')).toHaveText('3')
+  })
+
+  test('leaves the wheel alone when disabled', async ({ page }) => {
+    await page.goto('/e2e?zoomWithScroll=0&parentWidth=480&parentHeight=360')
+    await expect(page.getByTestId('zoom')).toHaveText('1')
+    await page.mouse.move(240, 180)
+    await page.mouse.wheel(0, -400)
+    await expect(page.getByTestId('zoom')).toHaveText('1')
+  })
+})

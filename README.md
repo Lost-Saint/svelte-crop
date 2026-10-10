@@ -20,6 +20,7 @@ This is a rewrite of `react-easy-crop` (https://github.com/valentinh/react-easy-
 
 - Supports drag and zoom interactions
 - Supports pinch zoom, two-finger rotation, and video sources
+- Supports `contain` and `cover` object fits (including `horizontal-cover` and `vertical-cover`)
 - Supports arrow-key cropping and restoring saved crops
 - Recalculates the crop when its container resizes
 - Provides crop dimensions as pixels and percentages
@@ -78,13 +79,16 @@ npm install svelte-crop --save
 | `minZoom`          | number                              |          | Minimum zoom of the media. Defaults to 1.                                                                                                                                                                                                                                                                   |
 | `maxZoom`          | number                              |          | Maximum zoom of the media. Defaults to 3.                                                                                                                                                                                                                                                                   |
 | `cropShape`        | 'rect' \| 'round'                   |          | Shape of the crop area. Defaults to 'rect'.                                                                                                                                                                                                                                                                 |
+| `objectFit`        | 'contain' \| 'cover' \| 'horizontal-cover' \| 'vertical-cover' |       | How the media is fitted inside the cropper. `contain` keeps it fully visible. `horizontal-cover` fills the cropper width, `vertical-cover` fills its height, and `cover` picks whichever keeps the media fully visible. Defaults to `contain`. |
 | `cropSize`         | `{ width: number, height: number }` |          | Size of the crop area (in pixels). If you don't provide it, it is computed from `aspect`, the media, and its rotation.                                                                                                                                        |
 | `showGrid`         | boolean                             |          | Whether to show or not the grid (third-lines). Defaults to `true`.                                                                                                                                                                                                                                          |
 | `zoomSpeed`        | number                              |          | Multiplies the value by which the zoom changes. Defaults to 1.                                                                                                                                                                                                                                              |
+| `zoomWithScroll`   | boolean                             |          | Whether the mouse wheel zooms the media. Defaults to `true`. Set to `false` to let the wheel scroll the page over the cropper.                                                                                                                                                                               |
 | `crossOrigin`      | string                              |          | Allows setting the crossOrigin attribute on the image or video.                                                                                                                                                                                                                                             |
 | `restrictPosition` | boolean                             |          | Whether the position of the media should be restricted to the boundaries of the cropper.                                                                                                                                                                                                                   |
 | `oncropcomplete`   | function(details)                    |          | Called when media loads and after an interaction settles. Use this callback to save the cropped area.                                                                                                                                                                                                        |
 | `oncropareachange` | function(details)                    |          | Called whenever crop, zoom, rotation, or media dimensions change. It has the same `{ percent, pixels }` payload as `oncropcomplete`.                                                                                                                                                                         |
+| `onMediaLoaded`    | function(mediaSize)                  |          | Called once per media source after it loads and its rendered size is measured. `mediaSize` is `{ width, height, naturalWidth, naturalHeight }` where `width`/`height` are the rendered (object-fit dependent) bounds and `natural*` the source pixels. Useful for a custom zoom or crop strategy based on media size. |
 
 ## Restoring a saved crop
 
@@ -163,6 +167,19 @@ const area = {
   width: number, // width of the cropped area
   height: number, // height of the cropped area
 }
+```
+
+### onMediaLoaded
+
+Called once per media source with its rendered size. Use it to adapt zoom or crop from the measured media, for example to always fit a fixed height:
+
+```svelte
+<Cropper
+  {image}
+  bind:crop
+  bind:zoom
+  onMediaLoaded={({ height }) => (zoom = CONTAINER_HEIGHT / height)}
+/>
 ```
 
 

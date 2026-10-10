@@ -26,8 +26,10 @@
 		aspect = 4 / 3,
 		cropSize = null,
 		cropShape = 'rect',
+		objectFit = 'contain',
 		showGrid = true,
 		zoomSpeed = 1,
+		zoomWithScroll = true,
 		crossOrigin = null,
 		restrictPosition = true,
 		initialCroppedAreaPercentages,
@@ -36,6 +38,7 @@
 		tabindex = 0,
 		oncropcomplete,
 		oncropareachange,
+		onMediaLoaded,
 	}: Props = $props()
 
 	let mediaSize = $state.raw<MediaSize | null>(null)
@@ -65,6 +68,21 @@
 	)
 	let videoSources = $derived<VideoSrc[]>(
 		video === undefined ? [] : typeof video === 'string' ? [{ src: video }] : video,
+	)
+	let resolvedObjectFit = $derived(
+		mediaSize && containerRect
+			? helpers.resolveObjectFit(objectFit, {
+				containerAspect: containerRect.width / containerRect.height,
+				mediaAspect: mediaSize.naturalWidth / mediaSize.naturalHeight,
+			})
+			: helpers.resolveObjectFit(objectFit, { containerAspect: 1, mediaAspect: 1 }),
+	)
+	let objectFitClass = $derived(
+		resolvedObjectFit === 'contain'
+			? 'svelte-crop-contain'
+			: resolvedObjectFit === 'horizontal-cover'
+			? 'svelte-crop-cover-horizontal'
+			: 'svelte-crop-cover-vertical',
 	)
 
 	let containerEl: HTMLDivElement | undefined
@@ -104,6 +122,7 @@
 	let cleanDocumentListeners = (): void => {}
 	let mediaReadyForSource = false
 	let initialCropAppliedForLoad = false
+	let mediaLoadedNotified = false
 	let currentMediaSourceKey = getMediaSourceKey()
 	let lastValidAreaPercentages: CropArea | null = null
 
@@ -116,6 +135,7 @@
 	const resetMediaLoad = (): void => {
 		mediaReadyForSource = false
 		initialCropAppliedForLoad = false
+		mediaLoadedNotified = false
 		mediaSize = null
 		lastValidAreaPercentages = null
 	}
@@ -230,6 +250,10 @@
 		if (mediaReadyForSource && initialCropAppliedForLoad) return
 		mediaReadyForSource = true
 		computeSizes()
+		if (!mediaLoadedNotified && mediaSize && hasPositiveSize(mediaSize)) {
+			mediaLoadedNotified = true
+			onMediaLoaded?.(mediaSize)
+		}
 	}
 
 	const computeSizes = (): void => {
@@ -266,16 +290,18 @@
 			return
 		}
 
-		const scale = Math.min(
-			1,
-			measuredRect.width / naturalWidth,
-			measuredRect.height / naturalHeight,
+		const renderedSize = helpers.getMediaSize(
+			measuredRect.width,
+			measuredRect.height,
+			naturalWidth,
+			naturalHeight,
+			objectFit,
 		)
 		const nextMediaSize: MediaSize = {
 			// Replaced media elements expose integer layout dimensions. Keeping
 			// crop math on those same pixel bounds preserves drag/zoom limits.
-			width: Math.round(naturalWidth * scale),
-			height: Math.round(naturalHeight * scale),
+			width: renderedSize.width,
+			height: renderedSize.height,
 			naturalWidth,
 			naturalHeight,
 		}
@@ -324,6 +350,12 @@
 			scheduleDebouncedCropComplete()
 		}
 	}
+
+	// Changing the object fit re-measures the media and re-applies the crop.
+	$effect(() => {
+		void objectFit
+		untrack(computeSizes)
+	})
 
 	const getMousePoint = (e: MouseEvent): { x: number; y: number } => ({
 		x: e.clientX,
@@ -563,6 +595,7 @@
 	}
 
 	const onWheel = (e: WheelEvent): void => {
+		if (!zoomWithScroll) return
 		computeSizes()
 		e.preventDefault()
 		const point = getMousePoint(e)
@@ -833,7 +866,7 @@
 	{#if video !== undefined}
 		<video
 			bind:this={videoEl}
-			class="svelte-crop-video"
+			class={['svelte-crop-video', objectFitClass]}
 			data-testid="video"
 			autoplay
 			playsinline
@@ -853,7 +886,7 @@
 	{:else}
 		<img
 			bind:this={imgEl}
-			class="svelte-crop-image"
+			class={['svelte-crop-image', objectFitClass]}
 			data-testid="image"
 			src={image}
 			onload={onMediaLoad}
@@ -888,10 +921,18 @@
 	user-select: none;
 	touch-action: none;
 	cursor: move;
+	display: flex;
+	justify-content: center;
+	align-items: center;
 }
 
 .svelte-crop-image,
 .svelte-crop-video {
+	will-change: transform;
+	max-width: unset;
+}
+
+.svelte-crop-contain {
 	max-width: 100%;
 	max-height: 100%;
 	margin: auto;
@@ -900,7 +941,16 @@
 	bottom: 0;
 	left: 0;
 	right: 0;
-	will-change: transform;
+}
+
+.svelte-crop-cover-horizontal {
+	width: 100%;
+	height: auto;
+}
+
+.svelte-crop-cover-vertical {
+	width: auto;
+	height: 100%;
 }
 
 .svelte-crop-area {

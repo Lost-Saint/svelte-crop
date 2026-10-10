@@ -5,7 +5,9 @@ import type {
   InitialCropFromPixelsOptions,
   InitialCropGeometryOptions,
   MediaSize,
+  ObjectFit,
   Point,
+  ResolvedObjectFit,
   Size,
 } from './types.js'
 
@@ -43,6 +45,57 @@ export function getCropSize(
   return {
     width: fittingWidth,
     height: fittingWidth / aspect,
+  }
+}
+
+/**
+ * Resolve the `cover` object fit into the concrete fit for the given aspect
+ * ratios. `cover` picks the axis whose fill keeps the whole media visible.
+ */
+export function resolveObjectFit(
+  objectFit: ObjectFit,
+  { containerAspect, mediaAspect }: { containerAspect: number; mediaAspect: number },
+): ResolvedObjectFit {
+  if (objectFit === 'cover') {
+    return mediaAspect < containerAspect ? 'horizontal-cover' : 'vertical-cover'
+  }
+  return objectFit
+}
+
+/**
+ * Compute the rendered media size for a given object fit.
+ * `contain` scales the media down to stay fully visible (never up).
+ * Cover fits fill one container axis and let the other overflow.
+ */
+export function getMediaSize(
+  containerWidth: number,
+  containerHeight: number,
+  naturalWidth: number,
+  naturalHeight: number,
+  objectFit: ObjectFit = 'contain',
+): Size {
+  const mediaAspect = naturalWidth / naturalHeight
+  const fit = resolveObjectFit(objectFit, {
+    containerAspect: containerWidth / containerHeight,
+    mediaAspect,
+  })
+
+  switch (fit) {
+    case 'horizontal-cover':
+      return { width: containerWidth, height: containerWidth / mediaAspect }
+    case 'vertical-cover':
+      return { width: containerHeight * mediaAspect, height: containerHeight }
+    case 'contain': {
+      const scale = Math.min(1, containerWidth / naturalWidth, containerHeight / naturalHeight)
+      return {
+        width: Math.round(naturalWidth * scale),
+        height: Math.round(naturalHeight * scale),
+      }
+    }
+    default: {
+      const _exhaustive: never = fit
+      return _exhaustive
+    }
   }
 }
 

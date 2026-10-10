@@ -23,6 +23,56 @@ describe('Helpers', () => {
     })
   })
 
+  describe('resolveObjectFit', () => {
+    test('returns the concrete fit unchanged', () => {
+      expect(helpers.resolveObjectFit('contain', { containerAspect: 1, mediaAspect: 2 })).toBe('contain')
+      expect(
+        helpers.resolveObjectFit('horizontal-cover', { containerAspect: 1, mediaAspect: 2 }),
+      ).toBe('horizontal-cover')
+      expect(helpers.resolveObjectFit('vertical-cover', { containerAspect: 1, mediaAspect: 2 })).toBe(
+        'vertical-cover',
+      )
+    })
+
+    test('resolves cover to the fit that keeps the media visible', () => {
+      expect(helpers.resolveObjectFit('cover', { containerAspect: 1, mediaAspect: 0.5 })).toBe(
+        'horizontal-cover',
+      )
+      expect(helpers.resolveObjectFit('cover', { containerAspect: 1, mediaAspect: 2 })).toBe(
+        'vertical-cover',
+      )
+    })
+  })
+
+  describe('getMediaSize', () => {
+    test('contain scales the media down to stay fully visible', () => {
+      expect(helpers.getMediaSize(100, 100, 200, 100, 'contain')).toEqual({ width: 100, height: 50 })
+    })
+
+    test('contain never scales the media up', () => {
+      expect(helpers.getMediaSize(1000, 1000, 200, 100, 'contain')).toEqual({ width: 200, height: 100 })
+    })
+
+    test('horizontal-cover fills the container width', () => {
+      expect(helpers.getMediaSize(200, 100, 100, 100, 'horizontal-cover')).toEqual({
+        width: 200,
+        height: 200,
+      })
+    })
+
+    test('vertical-cover fills the container height', () => {
+      expect(helpers.getMediaSize(200, 100, 100, 100, 'vertical-cover')).toEqual({
+        width: 100,
+        height: 100,
+      })
+    })
+
+    test('cover resolves per media and container aspect', () => {
+      expect(helpers.getMediaSize(100, 100, 50, 100, 'cover')).toEqual({ width: 100, height: 200 })
+      expect(helpers.getMediaSize(100, 100, 200, 100, 'cover')).toEqual({ width: 200, height: 100 })
+    })
+  })
+
   describe('restrictPosition', () => {
     test('position within the cropped area should be returned as-is', () => {
       const position = { x: 0, y: 0 }
