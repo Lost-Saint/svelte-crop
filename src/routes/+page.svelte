@@ -28,5 +28,22 @@
 />
 
 {#if lastCrop}
-	<pre data-testid="crop-data">{JSON.stringify(lastCrop)}</pre>
+	<pre data-testid="crop-data" class="crop-data">{JSON.stringify(lastCrop)}</pre>
 {/if}
+
+<style>
+/* Fixed overlay, click-through: never intercepts crop interactions or layout. */
+.crop-data {
+	position: fixed;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	margin: 0;
+	padding: 0.5rem;
+	overflow: hidden;
+	background: rgb(0 0 0 / 0.65);
+	color: #fff;
+	font-size: 12px;
+	pointer-events: none;
+}
+</style>

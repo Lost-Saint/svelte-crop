@@ -301,6 +301,7 @@
 	<img
 		bind:this={imgEl}
 		class="svelte-easy-crop-image"
+		data-testid="image"
 		src={image}
 		onload={onImgLoad}
 		alt=""

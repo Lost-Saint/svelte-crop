@@ -121,6 +121,17 @@ describe('Helpers', () => {
       expect(areas.croppedAreaPixels).toEqual({ height: 300, width: 500, x: 750, y: 450 })
     })
 
+    test('computes height from width for portrait images to preserve the aspect', () => {
+      const crop = { x: 0, y: 0 }
+      const imgSize = { width: 300, height: 600, naturalWidth: 600, naturalHeight: 1200 }
+      const cropSize = { width: 300, height: 225 }
+      const aspect = 4 / 3
+      const zoom = 1
+      const areas = helpers.computeCroppedArea(crop, imgSize, cropSize, aspect, zoom)
+      expect(areas.croppedAreaPercentages).toEqual({ x: 0, y: 31.25, width: 100, height: 37.5 })
+      expect(areas.croppedAreaPixels).toEqual({ width: 600, height: 450, x: 0, y: 375 })
+    })
+
     test('should not limit the position within image bounds when restrictPosition is false', () => {
       const crop = { x: 1000, y: 600 }
       const imgSize = { width: 1000, height: 600, naturalWidth: 2000, naturalHeight: 1200 }
