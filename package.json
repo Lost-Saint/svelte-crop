@@ -55,7 +55,6 @@
     "eslint-plugin-svelte": "^3.19.0",
     "globals": "^17.6.0",
     "publint": "^0.3.21",
-    "query-string": "^8.1.0",
     "svelte": "^5.57.1",
     "svelte-check": "^4.6.0",
     "typescript": "^6.0.3",
