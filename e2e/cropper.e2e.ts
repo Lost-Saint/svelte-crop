@@ -92,6 +92,62 @@ test.describe('crop events', () => {
     await expect(page.getByTestId('crop-data')).toContainText('percent')
     await expect(page.getByTestId('crop-data')).toContainText('pixels')
   })
+
+  test('updates crop area data during interaction', async ({ page }) => {
+    const liveCropData = page.getByTestId('live-crop-data')
+    await expect(liveCropData).toContainText('percent')
+    const initialCrop = await liveCropData.textContent()
+
+    await dragImage(page, 50, 0)
+    await expect.poll(() => liveCropData.textContent()).not.toBe(initialCrop)
+  })
+})
+
+test('loads and crops a video source', async ({ page }) => {
+  await page.goto('/?video=/videos/sample.webm')
+  const video = page.getByTestId('video')
+  await expect(video).toBeVisible()
+  await expect
+    .poll(() => video.evaluate(element => (element as HTMLVideoElement).videoWidth))
+    .toBeGreaterThan(0)
+  await expect(page.getByTestId('crop-data')).toContainText('pixels')
+})
+
+test('rotates the media and fits the crop area to rotated bounds', async ({ page }) => {
+  await page.goto('/?rotation=90')
+  const image = page.getByTestId('image')
+  await expect(image).toBeVisible()
+  await expectBox(page.getByTestId('cropper'), 670, 502.5)
+
+  const matrix = await image.evaluate(element => {
+    const transform = new DOMMatrixReadOnly(getComputedStyle(element).transform)
+    return { a: transform.a, b: transform.b, c: transform.c, d: transform.d }
+  })
+  expect(matrix.a).toBeCloseTo(0)
+  expect(matrix.b).toBeCloseTo(1)
+  expect(matrix.c).toBeCloseTo(-1)
+  expect(matrix.d).toBeCloseTo(0)
+})
+
+test('keeps the pointer anchored when zooming rotated media', async ({ page }) => {
+  await page.goto('/?rotation=90')
+  await expect(page.getByTestId('cropper')).toBeVisible()
+  const image = page.getByTestId('image')
+  await page.mouse.move(600, 380)
+  await page.mouse.wheel(0, -100)
+
+  await expect
+    .poll(() =>
+      image.evaluate(element => {
+        const transform = new DOMMatrixReadOnly(getComputedStyle(element).transform)
+        return {
+          b: Number(transform.b.toFixed(3)),
+          e: Number(transform.e.toFixed(3)),
+          f: Number(transform.f.toFixed(3)),
+        }
+      }),
+    )
+    .toEqual({ b: 1.5, e: 20, f: -10 })
 })
 
 test.describe('mouse interactions', () => {
@@ -186,6 +242,19 @@ test.describe('touch interactions', () => {
 
     await pinch(page, -4)
     await expect(page.getByTestId('image')).toHaveCSS('transform', 'matrix(1.2, 0, 0, 1.2, 128, 57)')
+  })
+
+  test('keeps the rotation while zooming with a pinch gesture', async ({ page }) => {
+    await page.goto('/?rotation=90')
+    await pinch(page, 10)
+    const matrix = await page.getByTestId('image').evaluate(element => {
+      const transform = new DOMMatrixReadOnly(getComputedStyle(element).transform)
+      return { a: transform.a, b: transform.b, c: transform.c, d: transform.d }
+    })
+    expect(matrix.a).toBeCloseTo(0)
+    expect(matrix.b).toBeCloseTo(2)
+    expect(matrix.c).toBeCloseTo(-2)
+    expect(matrix.d).toBeCloseTo(0)
   })
 
   test('zooms around the midpoint between touches', async ({ page }) => {

@@ -19,8 +19,10 @@ This is a rewrite of `react-easy-crop` (https://github.com/valentinh/react-easy-
 ## Features
 
 - Supports drag and zoom interactions
+- Supports pinch zoom, rotation, and video sources
 - Provides crop dimensions as pixels and percentages
 - Supports any images format (JPEG, PNG, even GIF) as url or base 64 string
+- Emits live crop area updates while cropping
 - Mobile friendly
 
 ## Installation
@@ -61,21 +63,38 @@ npm install svelte-easy-crop --save
 
 | Prop               | Type                                | Required | Description                                                                                                                                                                                                                                                                                                 |
 | :----------------- | :---------------------------------- | :------: | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `image`            | string                              |    ✓     | The image to be cropped.                                                                                                                                                                                                                                                                                    |
-| `crop`             | `{ x: number, y: number }`          |    ✓     | Position of the image. `{ x: 0, y: 0 }` will center the image under the cropper.                                                                                                                                                                                                                            |
-| `zoom`             | number                              |          | Zoom of the image between `minZoom` and `maxZoom`. Defaults to 1.                                                                                                                                                                                                                                           |
-| `aspect`           | number                              |          | Aspect of the cropper. The value is the ratio between its width and its height. The default value is `4/3`                                                                                                                                                                                                  |
-| `minZoom`          | number                              |          | Minimum zoom of the image. Defaults to 1.                                                                                                                                                                                                                                                                   |
-| `maxZoom`          | number                              |          | Maximum zoom of the image. Defaults to 3.                                                                                                                                                                                                                                                                   |
+| `image`            | string                              | one of the two | Image URL or data URL. Provide exactly one of `image` or `video`.                                                                                                                                                                                                                                     |
+| `video`            | `string \| { src: string, type?: string }[]` | one of the two | Video URL or source list. Video playback is muted, looping, and inline.                                                                                                                                                                                                                         |
+| `crop`             | `{ x: number, y: number }`          |          | Position of the media. `{ x: 0, y: 0 }` centers it under the crop area.                                                                                                                                                                                                                                     |
+| `zoom`             | number                              |          | Zoom of the media between `minZoom` and `maxZoom`. Defaults to 1.                                                                                                                                                                                                                                           |
+| `rotation`         | number                              |          | Rotation in degrees. Defaults to 0. Can be bound to update it from user controls.                                                                                                                                                                                                                            |
+| `aspect`           | number                              |          | Aspect of the cropper. The value is the ratio between its width and its height. The default value is `4/3`.                                                                                                                                                                                                 |
+| `minZoom`          | number                              |          | Minimum zoom of the media. Defaults to 1.                                                                                                                                                                                                                                                                   |
+| `maxZoom`          | number                              |          | Maximum zoom of the media. Defaults to 3.                                                                                                                                                                                                                                                                   |
 | `cropShape`        | 'rect' \| 'round'                   |          | Shape of the crop area. Defaults to 'rect'.                                                                                                                                                                                                                                                                 |
-| `cropSize`         | `{ width: number, height: number }` |          | Size of the crop area (in pixels). If you don't provide it, it will be computed automatically using the `aspect` prop and the image size.                                                                                                                                                                   |
+| `cropSize`         | `{ width: number, height: number }` |          | Size of the crop area (in pixels). If you don't provide it, it is computed from `aspect`, the media, and its rotation.                                                                                                                                        |
 | `showGrid`         | boolean                             |          | Whether to show or not the grid (third-lines). Defaults to `true`.                                                                                                                                                                                                                                          |
 | `zoomSpeed`        | number                              |          | Multiplies the value by which the zoom changes. Defaults to 1.                                                                                                                                                                                                                                              |
-| `crossOrigin`      | string                              |          | Allows setting the crossOrigin attribute on the image.                                                                                                                                                                                                                                                      |
-| `restrictPosition` | boolean                             |          | Whether the position of the image should be restricted to the boundaries of the cropper. Useful setting in case of `zoom < 1` or if the cropper should preserve all image content while forcing a specific aspect ratio for image throughout the application. Example: https://codesandbox.io/s/1rmqky233q. |
-| `oncropcomplete` | function(details)                             |          | This callback is the one you should use to save the cropped area of the image. |
+| `crossOrigin`      | string                              |          | Allows setting the crossOrigin attribute on the image or video.                                                                                                                                                                                                                                             |
+| `restrictPosition` | boolean                             |          | Whether the position of the media should be restricted to the boundaries of the cropper.                                                                                                                                                                                                                   |
+| `oncropcomplete`   | function(details)                    |          | Called when media loads and after an interaction settles. Use this callback to save the cropped area.                                                                                                                                                                                                        |
+| `oncropareachange` | function(details)                    |          | Called whenever crop, zoom, rotation, or media dimensions change. It has the same `{ percent, pixels }` payload as `oncropcomplete`.                                                                                                                                                                         |
 
 ## Callbacks
+
+### oncropareachange
+
+Use this callback for a live preview of the crop coordinates. Keep `oncropcomplete` for saving a crop after an interaction settles.
+
+```svelte
+<Cropper
+  {image}
+  bind:crop
+  bind:zoom
+  bind:rotation
+  oncropareachange={(area) => (liveCrop = area)}
+/>
+```
 
 ### oncropcomplete
 

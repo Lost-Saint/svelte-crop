@@ -4,16 +4,22 @@ import * as helpers from './helpers.js'
 describe('Helpers', () => {
   describe('getCropSize', () => {
     test('when image width is higher than the height based on the aspect', () => {
-      const cropSize = helpers.getCropSize(1200, 600, 4 / 3)
+      const cropSize = helpers.getCropSize(1200, 600, 1200, 600, 4 / 3)
       expect(cropSize).toEqual({ height: 600, width: 800 })
     })
     test('when image width is smaller than the height based on the aspect', () => {
-      const cropSize = helpers.getCropSize(600, 1200, 4 / 3)
+      const cropSize = helpers.getCropSize(600, 1200, 600, 1200, 4 / 3)
       expect(cropSize).toEqual({ height: 450, width: 600 })
     })
     test('when image dimensions exactly match the aspect', () => {
-      const cropSize = helpers.getCropSize(800, 600, 4 / 3)
+      const cropSize = helpers.getCropSize(800, 600, 800, 600, 4 / 3)
       expect(cropSize).toEqual({ height: 600, width: 800 })
+    })
+
+    test('fits the rotated media bounds inside the container', () => {
+      const cropSize = helpers.getCropSize(100, 50, 80, 80, 4 / 3, 90)
+      expect(cropSize.width).toBeCloseTo(50)
+      expect(cropSize.height).toBeCloseTo(37.5)
     })
   })
 
@@ -87,6 +93,26 @@ describe('Helpers', () => {
     })
   })
 
+  describe('rotation', () => {
+    test('computes the bounding size after rotation', () => {
+      const size = helpers.rotateSize(100, 50, 90)
+      expect(size.width).toBeCloseTo(50)
+      expect(size.height).toBeCloseTo(100)
+    })
+
+    test('rotates a centered point', () => {
+      const point = helpers.rotatePoint({ x: 1, y: 0 }, 90)
+      expect(point.x).toBeCloseTo(0)
+      expect(point.y).toBeCloseTo(1)
+    })
+
+    test('restricts position using the rotated media bounds', () => {
+      const position = helpers.restrictPosition({ x: 100, y: 100 }, { width: 100, height: 50 }, { width: 30, height: 30 }, 1, 90)
+      expect(position.x).toBeCloseTo(10)
+      expect(position.y).toBeCloseTo(35)
+    })
+  })
+
   describe('computeCroppedArea', () => {
     test('should compute the correct areas when the image was not moved', () => {
       const crop = { x: 0, y: 0 }
@@ -138,9 +164,25 @@ describe('Helpers', () => {
       const cropSize = { width: 500, height: 300 }
       const aspect = 4 / 3
       const zoom = 1
-      const areas = helpers.computeCroppedArea(crop, imgSize, cropSize, aspect, zoom, false)
+      const areas = helpers.computeCroppedArea(crop, imgSize, cropSize, aspect, zoom, 0, false)
       expect(areas.croppedAreaPercentages).toEqual({ height: 50, width: 50, x: -75, y: -75 })
       expect(areas.croppedAreaPixels).toEqual({ height: 600, width: 800, x: -1500, y: -900 })
+    })
+
+    test('computes crop data against the rotated media bounds', () => {
+      const areas = helpers.computeCroppedArea(
+        { x: 0, y: 0 },
+        { width: 100, height: 50, naturalWidth: 200, naturalHeight: 100 },
+        { width: 50, height: 50 },
+        1,
+        1,
+        90,
+      )
+      expect(areas.croppedAreaPercentages.x).toBeCloseTo(0)
+      expect(areas.croppedAreaPercentages.y).toBeCloseTo(25)
+      expect(areas.croppedAreaPercentages.width).toBeCloseTo(100)
+      expect(areas.croppedAreaPercentages.height).toBeCloseTo(50)
+      expect(areas.croppedAreaPixels).toEqual({ x: 0, y: 50, width: 100, height: 100 })
     })
   })
 

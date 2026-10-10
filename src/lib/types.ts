@@ -15,11 +15,12 @@ export interface OnCropCompleteEvent {
 }
 
 export type OnCropComplete = (event: OnCropCompleteEvent) => void
+export type OnCropAreaChange = (event: OnCropCompleteEvent) => void
 
-export interface Props {
-  image: string
+export interface CropperOptions {
   crop?: Point
   zoom?: number
+  rotation?: number
   aspect?: number
   minZoom?: number
   maxZoom?: number
@@ -31,6 +32,22 @@ export interface Props {
   restrictPosition?: boolean
   tabindex?: number
   oncropcomplete?: OnCropComplete
+  /**
+   * Same payload as `oncropcomplete`, but fired live on every crop, zoom or
+   * rotation change instead of only when an interaction settles.
+   * Like `oncropcomplete`, never write `crop`/`zoom`/`rotation` back
+   * synchronously from this callback (infinite loop).
+   */
+  oncropareachange?: OnCropAreaChange
+}
+
+/** Provide exactly one media source. */
+export type Props = CropperOptions &
+  ({ image: string; video?: never } | { image?: never; video: string | VideoSrc[] })
+
+export interface VideoSrc {
+  src: string
+  type?: string
 }
 
 /** Back-compat alias — prefer `Props` in new code. */
@@ -41,10 +58,13 @@ export interface Size {
   height: number
 }
 
-export interface ImageSize extends Size {
+export interface MediaSize extends Size {
   naturalWidth: number
   naturalHeight: number
 }
+
+/** @deprecated Prefer `MediaSize`; the cropper also supports video. */
+export type ImageSize = MediaSize
 
 export interface Point {
   x: number

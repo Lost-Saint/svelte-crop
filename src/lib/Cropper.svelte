@@ -1,15 +1,17 @@
 <script lang="ts">
+	import { onMount } from 'svelte'
 	import type { Attachment } from 'svelte/attachments'
 	import { on } from 'svelte/events'
 	import * as helpers from './helpers.js'
-	import type { ImageSize, Props } from './types.js'
+	import type { MediaSize, OnCropCompleteEvent, Props, VideoSrc } from './types.js'
 
-	// Only crop/zoom are $bindable: they are the only props reassigned
-	// inside this component. Everything else is read-only input.
+	// crop, zoom, and rotation are bindable because interactions update them.
 	let {
 		image,
+		video,
 		crop = $bindable({ x: 0, y: 0 }),
 		zoom = $bindable(1),
+		rotation = $bindable(0),
 		minZoom = 1,
 		maxZoom = 3,
 		aspect = 4 / 3,
@@ -21,27 +23,46 @@
 		restrictPosition = true,
 		tabindex = undefined,
 		oncropcomplete,
+		oncropareachange,
 	}: Props = $props()
 
-	let imageSize = $state.raw<ImageSize | null>(null)
-	// Derived from props + imageSize — re-evaluates automatically, no $effect needed.
+	let mediaSize = $state.raw<MediaSize | null>(null)
+	let containerRect = $state.raw<DOMRect | null>(null)
+	// Derived from props + measured media/container sizes.
 	let cropperSize = $derived.by(() => {
-		if (!imageSize) return null
-		return cropSize ?? helpers.getCropSize(imageSize.width, imageSize.height, aspect)
+		if (!mediaSize || !containerRect) return null
+		return (
+			cropSize
+				?? helpers.getCropSize(
+					mediaSize.width,
+					mediaSize.height,
+					containerRect.width,
+					containerRect.height,
+					aspect,
+					rotation,
+				)
+		)
 	})
 	let aspectValue = $derived(cropSize ? cropSize.width / cropSize.height : aspect)
-	let transform = $derived(`translate(${crop.x}px, ${crop.y}px) scale(${zoom})`)
+	let transform = $derived(
+		`translate(${crop.x}px, ${crop.y}px) rotate(${rotation}deg) scale(${zoom})`,
+	)
+	let videoSources = $derived<VideoSrc[]>(
+		video === undefined ? [] : typeof video === 'string' ? [{ src: video }] : video,
+	)
 
 	let containerEl: HTMLDivElement | undefined
-	let imgEl: HTMLImageElement | undefined
+	let imgEl = $state<HTMLImageElement>()
+	let videoEl = $state<HTMLVideoElement>()
 	// Plain (non-reactive) by design: only read inside event handlers,
 	// never in the template or a $derived — so no $state needed.
-	let containerRect: DOMRect | null = null
 	let dragStartPosition = { x: 0, y: 0 }
 	let dragStartCrop = { x: 0, y: 0 }
 	let lastPinchDistance = 0
 	let dragFrame: number | undefined
 	let zoomFrame: number | undefined
+	let completeFrame: number | undefined
+	let wheelTimer: number | undefined
 	let cleanDocumentListeners = (): void => {}
 
 	// this is to prevent Safari on iOS >= 10 to zoom the page
@@ -67,24 +88,50 @@
 			window.cancelAnimationFrame(zoomFrame)
 			zoomFrame = undefined
 		}
+		if (completeFrame !== undefined) {
+			window.cancelAnimationFrame(completeFrame)
+			completeFrame = undefined
+		}
+		if (wheelTimer !== undefined) {
+			window.clearTimeout(wheelTimer)
+			wheelTimer = undefined
+		}
 	}
 
-	const onImgLoad = (): void => {
+	const onMediaLoad = (): void => {
 		computeSizes()
-		emitCropData()
+		emitCropComplete()
 	}
 
 	const computeSizes = (): void => {
-		if (imgEl && imgEl.naturalWidth > 0) {
-			imageSize = {
-				width: imgEl.width,
-				height: imgEl.height,
-				naturalWidth: imgEl.naturalWidth,
-				naturalHeight: imgEl.naturalHeight,
-			}
-		}
 		if (containerEl) {
 			containerRect = containerEl.getBoundingClientRect()
+		}
+		if (!containerRect || containerRect.width === 0 || containerRect.height === 0) return
+
+		const naturalWidth = video !== undefined
+			? (videoEl?.videoWidth ?? 0)
+			: (imgEl?.naturalWidth ?? 0)
+		const naturalHeight = video !== undefined
+			? (videoEl?.videoHeight ?? 0)
+			: (imgEl?.naturalHeight ?? 0)
+		if (naturalWidth === 0 || naturalHeight === 0) {
+			mediaSize = null
+			return
+		}
+
+		const scale = Math.min(
+			1,
+			containerRect.width / naturalWidth,
+			containerRect.height / naturalHeight,
+		)
+		mediaSize = {
+			// Replaced media elements expose integer layout dimensions. Keeping
+			// crop math on those same pixel bounds preserves drag/zoom limits.
+			width: Math.round(naturalWidth * scale),
+			height: Math.round(naturalHeight * scale),
+			naturalWidth,
+			naturalHeight,
 		}
 	}
 
@@ -145,7 +192,7 @@
 
 		dragFrame = window.requestAnimationFrame(() => {
 			dragFrame = undefined
-			if (!imageSize || !cropperSize) return
+			if (!mediaSize || !cropperSize) return
 			const offsetX = x - dragStartPosition.x
 			const offsetY = y - dragStartPosition.y
 			const requestedPosition = {
@@ -154,14 +201,25 @@
 			}
 
 			crop = restrictPosition
-				? helpers.restrictPosition(requestedPosition, imageSize, cropperSize, zoom)
+				? helpers.restrictPosition(
+					requestedPosition,
+					mediaSize,
+					cropperSize,
+					zoom,
+					rotation,
+				)
 				: requestedPosition
 		})
 	}
 
 	const onDragStopped = (): void => {
 		cleanDragListeners()
-		emitCropData()
+		if (completeFrame !== undefined) window.cancelAnimationFrame(completeFrame)
+		// Let the last queued drag/pinch frame update the bound state first.
+		completeFrame = window.requestAnimationFrame(() => {
+			completeFrame = undefined
+			emitCropComplete()
+		})
 	}
 
 	const onPinchStart = (e: TouchEvent): void => {
@@ -200,6 +258,11 @@
 		const point = getMousePoint(e)
 		const newZoom = zoom - (e.deltaY * zoomSpeed) / 200
 		setNewZoom(newZoom, point)
+		if (wheelTimer !== undefined) window.clearTimeout(wheelTimer)
+		wheelTimer = window.setTimeout(() => {
+			wheelTimer = undefined
+			emitCropComplete()
+		}, 250)
 	}
 
 	const getPointOnContainer = (
@@ -212,64 +275,66 @@
 		}
 	}
 
-	const getPointOnImage = ({ x, y }: { x: number; y: number }): { x: number; y: number } => ({
-		x: (x + crop.x) / zoom,
-		y: (y + crop.y) / zoom,
-	})
+	const getPointOnImage = ({ x, y }: { x: number; y: number }): { x: number; y: number } =>
+		helpers.rotatePoint({ x: (x + crop.x) / zoom, y: (y + crop.y) / zoom }, -rotation)
 
 	const setNewZoom = (newZoom: number, point: { x: number; y: number }): void => {
-		if (!imageSize || !cropperSize) return
+		if (!mediaSize || !cropperSize) return
 		const zoomPoint = getPointOnContainer(point)
 		if (!zoomPoint) return
 		const zoomTarget = getPointOnImage(zoomPoint)
 		zoom = Math.min(maxZoom, Math.max(newZoom, minZoom))
 
+		const rotatedTarget = helpers.rotatePoint({
+			x: zoomTarget.x * zoom,
+			y: zoomTarget.y * zoom,
+		}, rotation)
 		const requestedPosition = {
-			x: zoomTarget.x * zoom - zoomPoint.x,
-			y: zoomTarget.y * zoom - zoomPoint.y,
+			x: rotatedTarget.x - zoomPoint.x,
+			y: rotatedTarget.y - zoomPoint.y,
 		}
 		crop = restrictPosition
-			? helpers.restrictPosition(requestedPosition, imageSize, cropperSize, zoom)
+			? helpers.restrictPosition(requestedPosition, mediaSize, cropperSize, zoom, rotation)
 			: requestedPosition
 	}
 
-	const emitCropData = (): void => {
-		if (!imageSize || !cropperSize || cropperSize.width === 0) return
+	const getCropData = (): OnCropCompleteEvent | null => {
+		if (!mediaSize || !cropperSize || cropperSize.width === 0) return null
 		// this is to ensure the crop is correctly restricted after a zoom back (https://github.com/ricardo-ch/svelte-easy-crop/issues/6)
 		const position = restrictPosition
-			? helpers.restrictPosition(crop, imageSize, cropperSize, zoom)
+			? helpers.restrictPosition(crop, mediaSize, cropperSize, zoom, rotation)
 			: crop
 		const { croppedAreaPercentages, croppedAreaPixels } = helpers.computeCroppedArea(
 			position,
-			imageSize,
+			mediaSize,
 			cropperSize,
 			aspectValue,
 			zoom,
+			rotation,
 			restrictPosition,
 		)
 
-		oncropcomplete?.({
+		return {
 			percent: croppedAreaPercentages,
 			pixels: croppedAreaPixels,
-		})
+		}
 	}
 
-	// Notify the parent whenever the visible crop changes. This $effect
-	// tracks crop/zoom/imageSize/cropperSize via emitCropData — it only
-	// notifies, it never writes state, so no cycle. Effects never run on
-	// the server, so no browser guard is needed.
+	const emitCropComplete = (): void => {
+		const cropData = getCropData()
+		if (cropData) oncropcomplete?.(cropData)
+	}
+
+	// Live updates follow every change to crop, zoom, rotation, or measured size.
 	$effect(() => {
-		if (imageSize && cropperSize) {
-			emitCropData()
-		}
+		const cropData = getCropData()
+		if (cropData) oncropareachange?.(cropData)
 	})
 
-	// Cached images may already be complete before onload can fire.
-	// $effect runs after mount on the client — the Svelte 5 successor to onMount.
-	$effect(() => {
-		if (imgEl?.complete) {
-			onImgLoad()
-		}
+	// Cached images and videos can finish loading before their load handler is attached.
+	onMount(() => {
+		if (videoEl && videoEl.readyState >= HTMLMediaElement.HAVE_METADATA) onMediaLoad()
+		else if (imgEl?.complete && imgEl.naturalWidth > 0) onMediaLoad()
 	})
 
 	const attachContainer: Attachment<HTMLDivElement> = node => {
@@ -298,16 +363,37 @@
 	role="button"
 	data-testid="container"
 >
-	<img
-		bind:this={imgEl}
-		class="svelte-easy-crop-image"
-		data-testid="image"
-		src={image}
-		onload={onImgLoad}
-		alt=""
-		style:transform={transform}
-		crossorigin={crossOrigin}
-	/>
+	{#if video !== undefined}
+		<video
+			bind:this={videoEl}
+			class="svelte-easy-crop-video"
+			data-testid="video"
+			autoplay
+			playsinline
+			loop
+			muted
+			controls={false}
+			preload="metadata"
+			onloadedmetadata={onMediaLoad}
+			style:transform={transform}
+			crossorigin={crossOrigin}
+		>
+			{#each videoSources as source (source.src)}
+				<source src={source.src} type={source.type} />
+			{/each}
+		</video>
+	{:else}
+		<img
+			bind:this={imgEl}
+			class="svelte-easy-crop-image"
+			data-testid="image"
+			src={image}
+			onload={onMediaLoad}
+			alt=""
+			style:transform={transform}
+			crossorigin={crossOrigin}
+		/>
+	{/if}
 	{#if cropperSize}
 		<div
 			class={[
@@ -336,7 +422,8 @@
 	cursor: move;
 }
 
-.svelte-easy-crop-image {
+.svelte-easy-crop-image,
+.svelte-easy-crop-video {
 	max-width: 100%;
 	max-height: 100%;
 	margin: auto;
