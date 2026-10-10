@@ -724,3 +724,27 @@ test.describe('zoomWithScroll', () => {
     await expect(page.getByTestId('zoom')).toHaveText('1')
   })
 })
+
+test.describe('customization', () => {
+  test('merges custom class names onto container, media, and crop area', async ({ page }) => {
+    await page.goto('/e2e?containerClass=my-container&mediaClass=my-media&cropAreaClass=my-crop&parentWidth=480&parentHeight=360')
+    await expect(page.getByTestId('container')).toHaveClass(/my-container/)
+    await expect(page.getByTestId('image')).toHaveClass(/my-media/)
+    await expect(page.getByTestId('cropper')).toHaveClass(/my-crop/)
+  })
+
+  test('spreads mediaProps onto the media element', async ({ page }) => {
+    await page.goto('/e2e?mediaProps=1&parentWidth=480&parentHeight=360')
+    await expect(page.getByTestId('image')).toHaveAttribute('draggable', 'false')
+  })
+
+  test('rounds the crop area to integer pixels', async ({ page }) => {
+    // contain in 480x360 yields a 334.666...px wide crop area.
+    await page.goto('/e2e?parentWidth=480&parentHeight=360')
+    await expect(page.getByTestId('cropper')).toHaveAttribute('style', /width: 334\.6/)
+
+    await page.goto('/e2e?roundCropAreaPixels=1&parentWidth=480&parentHeight=360')
+    await expect(page.getByTestId('cropper')).toHaveAttribute('style', 'width: 335px; height: 251px;')
+    await expectBox(page.getByTestId('cropper'), 335, 251)
+  })
+})

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import Cropper from '#lib'
-	import type { CropArea, CropperOptions, OnCropCompleteEvent, Point } from '#lib'
+	import type { CropArea, CropperClasses, CropperOptions, OnCropCompleteEvent, Point } from '#lib'
 	import { page } from '$app/state'
 
 	const params = page.url.searchParams
@@ -41,6 +41,18 @@
 			|| requestedObjectFit === 'vertical-cover'
 		? requestedObjectFit
 		: undefined
+	const containerClass = params.get('containerClass')
+	const mediaClass = params.get('mediaClass')
+	const cropAreaClass = params.get('cropAreaClass')
+	const classes: CropperClasses | undefined =
+		containerClass === null && mediaClass === null && cropAreaClass === null
+			? undefined
+			: {
+				containerClassName: containerClass ?? undefined,
+				mediaClassName: mediaClass ?? undefined,
+				cropAreaClassName: cropAreaClass ?? undefined,
+			}
+	const roundCropAreaPixels = params.get('roundCropAreaPixels') === '1'
 	const cropperOptions: CropperOptions = {
 		minZoom: 0.5,
 		maxZoom: 3,
@@ -48,6 +60,9 @@
 		...(initialPixels ? { initialCroppedAreaPixels: initialPixels } : {}),
 		...(keyboardStep === undefined ? {} : { keyboardStep }),
 		...(objectFit === undefined ? {} : { objectFit }),
+		...(params.get('mediaProps') === '1' ? { mediaProps: { draggable: false } } : {}),
+		...(classes === undefined ? {} : { classes }),
+		...(roundCropAreaPixels ? { roundCropAreaPixels: true } : {}),
 		...(params.get('zoomWithScroll') === '0' ? { zoomWithScroll: false } : {}),
 	}
 

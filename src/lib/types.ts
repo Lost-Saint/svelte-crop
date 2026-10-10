@@ -1,4 +1,4 @@
-import type { HTMLImgAttributes } from 'svelte/elements'
+import type { HTMLImgAttributes, HTMLVideoAttributes } from 'svelte/elements'
 
 export type CropShape = 'rect' | 'round'
 
@@ -13,6 +13,16 @@ export type ObjectFit = 'contain' | 'cover' | 'horizontal-cover' | 'vertical-cov
 
 /** `cover` resolved against the current media and container aspect ratios. */
 export type ResolvedObjectFit = Exclude<ObjectFit, 'cover'>
+
+/** Attributes accepted by both `<img>` and `<video>`, spread onto the media element. */
+export type MediaAttributes = HTMLImgAttributes & HTMLVideoAttributes
+
+/** CSS classes merged onto the cropper, media, and crop area elements. */
+export interface CropperClasses {
+  containerClassName?: string
+  mediaClassName?: string
+  cropAreaClassName?: string
+}
 
 export interface CropArea {
   x: number
@@ -71,6 +81,12 @@ export interface CropperOptions {
   /** How the media is fitted inside the cropper. Defaults to `contain`. */
   objectFit?: ObjectFit
   showGrid?: boolean
+  /** Attributes spread onto the media element (`<img>` or `<video>`). */
+  mediaProps?: MediaAttributes
+  /** CSS classes merged onto the cropper, media, and crop area elements. */
+  classes?: CropperClasses
+  /** Round the crop area dimensions to integer pixels. Defaults to `false`. */
+  roundCropAreaPixels?: boolean
   zoomSpeed?: number
   /** Whether the wheel zooms the media. Defaults to `true`. */
   zoomWithScroll?: boolean

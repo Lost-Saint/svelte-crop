@@ -28,6 +28,9 @@
 		cropShape = 'rect',
 		objectFit = 'contain',
 		showGrid = true,
+		mediaProps = {},
+		classes = {},
+		roundCropAreaPixels = false,
 		zoomSpeed = 1,
 		zoomWithScroll = true,
 		crossOrigin = null,
@@ -853,7 +856,7 @@
 
 <svelte:window onresize={computeSizes} />
 <div
-	class="svelte-crop-container"
+	class={['svelte-crop-container', classes.containerClassName]}
 	bind:this={containerEl}
 	{@attach attachContainer}
 	{tabindex}
@@ -865,8 +868,9 @@
 >
 	{#if video !== undefined}
 		<video
+			{...mediaProps}
 			bind:this={videoEl}
-			class={['svelte-crop-video', objectFitClass]}
+			class={[mediaProps.class, 'svelte-crop-video', objectFitClass, classes.mediaClassName]}
 			data-testid="video"
 			autoplay
 			playsinline
@@ -885,8 +889,9 @@
 		</video>
 	{:else}
 		<img
+			{...mediaProps}
 			bind:this={imgEl}
-			class={['svelte-crop-image', objectFitClass]}
+			class={[mediaProps.class, 'svelte-crop-image', objectFitClass, classes.mediaClassName]}
 			data-testid="image"
 			src={image}
 			onload={onMediaLoad}
@@ -901,9 +906,10 @@
 				'svelte-crop-area',
 				cropShape === 'round' && 'svelte-crop-round',
 				showGrid && 'svelte-crop-grid',
+				classes.cropAreaClassName,
 			]}
-			style:width={`${cropperSize.width}px`}
-			style:height={`${cropperSize.height}px`}
+			style:width={roundCropAreaPixels ? `${Math.round(cropperSize.width)}px` : `${cropperSize.width}px`}
+			style:height={roundCropAreaPixels ? `${Math.round(cropperSize.height)}px` : `${cropperSize.height}px`}
 			data-testid="cropper"
 		>
 		</div>
