@@ -203,7 +203,7 @@ Open `http://localhost:3000` to use the demo. Install the Playwright browser onc
 [package]: https://www.npmjs.com/package/svelte-crop
 [downloads-badge]: https://img.shields.io/npm/dm/svelte-crop?style=flat-square
 [npmstats]: https://npm-stat.com/charts.html?package=svelte-crop
-[gzip-badge]: https://img.badgesize.io/https://unpkg.com/svelte-crop@0.0.2/dist/index.js?compression=gzip&style=flat-square
+[gzip-badge]: https://img.badgesize.io/https://unpkg.com/svelte-crop@0.1.0/dist/index.js?compression=gzip&style=flat-square
 [license-badge]: https://img.shields.io/badge/license-GLWTS-blue?style=flat-square
 [license]: https://github.com/Lost-Saint/svelte-crop/blob/main/LICENSE
 [prs-badge]: https://img.shields.io/badge/PRs-welcome-brightgreen?style=flat-square
